@@ -22,6 +22,14 @@ FocusRelay brings your blocks and schedules into one place. Start a Quick Block,
 
 Want to control your blocks through an AI assistant? Connect your own relay and let an authorized MCP client manage the apps you choose. Local blocking works without an account or Cloudflare setup.
 
+## Screenshots
+
+| Blocking | Rules | Activity |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/blocking.jpg" alt="Quick Block and today's schedule timeline" width="240"> | <img src="docs/screenshots/rules.jpg" alt="Independent schedules and remote control" width="240"> | <img src="docs/screenshots/activity.jpg" alt="Daily screen time and recent blocking activity" width="240"> |
+
+*Captured from the earlier Design Preview on a Samsung phone. These screenshots still display the Mindful name; the current source uses FocusRelay.*
+
 ## Features
 
 ### Quick Block
