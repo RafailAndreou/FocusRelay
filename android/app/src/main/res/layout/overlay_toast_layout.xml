@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Modified by Rafail Andreou, 2026-10-26, for FocusRelay. Original notices retained. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/overlay_toast_root"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_gravity="top|center_horizontal"
+    android:background="@drawable/design_overlay_panel"
+    android:backgroundTint="@color/design_panel"
+    android:elevation="8dp"
+    android:gravity="center_vertical"
+    android:accessibilityLiveRegion="polite"
+    android:orientation="horizontal"
+    android:padding="8dp">
+
+
+    <ImageView
+        android:id="@+id/overlay_toast_app_icon"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_margin="8dp"
+        android:background="@drawable/shape_circular"
+        android:clipToOutline="true"
+        android:importantForAccessibility="no"
+        android:scaleType="centerCrop"
+        android:src="@mipmap/ic_launcher"
+        tools:ignore="UnusedAttribute" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingEnd="18dp"
+        tools:ignore="RtlSymmetry">
+
+        <TextView
+            android:id="@+id/overlay_toast_app_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:importantForAccessibility="no"
+            android:text="@string/app_name"
+            android:textColor="@color/design_muted"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/overlay_toast_screen_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:importantForAccessibility="no"
+            android:text="@string/app_screen_time_usage_info"
+            android:textColor="@color/design_text"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+</LinearLayout>
+

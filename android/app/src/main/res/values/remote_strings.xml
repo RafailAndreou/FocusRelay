@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Modified by Rafail Andreou, 2026-10-26, for FocusRelay. Original notices retained. -->
+<resources>
+    <string name="remote_block_title">Remote focus block</string>
+    <string name="remote_block_reason">This app is paused by your remote blocking rule. It will unlock when the timer ends. Manage remote blocks in FocusRelay.</string>
+    <string name="local_rule_title">Blocked by your rule</string>
+    <string name="local_rule_reason">%1$s is protecting this time. Manage your rules in Mindful.</string>
+</resources>
+

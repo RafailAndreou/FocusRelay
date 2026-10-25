@@ -1,0 +1,15 @@
+{
+  "name": "focusrelay-relay",
+  "version": "1.6.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.50.0"
+  },
+  "license": "GPL-2.0-only"
+}

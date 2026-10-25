@@ -1,0 +1,106 @@
+name: Build FocusRelay
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master, remote-control, focusrelay-publication]
+permissions:
+  contents: read
+concurrency:
+  group: remote-preview-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: relay/package-lock.json
+      - run: python3 scripts/check_publication.py
+      - run: npm ci
+        working-directory: relay
+      - run: npm test
+        working-directory: relay
+      - run: npx wrangler deploy --dry-run
+        working-directory: relay
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      MINDFUL_PREVIEW_SUFFIX: '.design'
+      CI: 'true'
+      FLUTTER_SUPPRESS_ANALYTICS: 'true'
+      DART_SUPPRESS_ANALYTICS: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out pinned upstream source
+        uses: actions/checkout@v4
+        with:
+          repository: akaMrNagar/Mindful
+          ref: b6eb68d500463c54e1127b6cc7ad540f02ae0c8e
+          path: upstream
+      - name: Apply our source changes
+        run: python3 scripts/apply_overlay.py upstream
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.7'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: upstream
+      - run: dart run build_runner build --delete-conflicting-outputs
+        working-directory: upstream
+      - run: flutter analyze lib/main.dart lib/config lib/core/extensions lib/ui/common lib/ui/dialogs lib/ui/onboarding lib/ui/permissions lib/ui/screens/blocking lib/ui/screens/focus/focus_mode lib/ui/screens/settings lib/ui/screens/remote_control lib/ui/screens/change_logs lib/ui/screens/websites_blocking lib/ui/splash_screen.dart lib/ui/transitions
+        working-directory: upstream
+      - run: flutter test test/remote test/blocking
+        working-directory: upstream
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: focusrelay-ui-preview
+          path: upstream/build/ui-preview/*.png
+          if-no-files-found: ignore
+      - name: Package complete corresponding source
+        run: python3 scripts/package_source.py upstream
+      - uses: actions/upload-artifact@v4
+        with:
+          name: focusrelay-complete-source
+          path: build/focusrelay-complete-source.tar.gz
+      - name: Build installable preview
+        # The SDK's debug signature is suitable for an initial private preview only.
+        # A stable personal release key is required before distributing updates.
+        run: flutter build apk --debug --target-platform android-arm64 --build-number=160 --build-name=1.6.0
+        working-directory: upstream
+      - name: Test remote calendars, snapshots and foreground detection
+        run: ./gradlew :app:testDebugUnitTest -Ptarget-platform=android-arm64
+        working-directory: upstream/android
+      - name: Summarize native regression tests
+        working-directory: upstream
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          reports = list(Path('build').rglob('TEST-*.xml'))
+          assert reports, 'Native JUnit reports are missing'
+          totals = {'tests': 0, 'failures': 0, 'errors': 0, 'skipped': 0}
+          for path in reports:
+              suite = ET.parse(path).getroot()
+              for key in totals:
+                  totals[key] += int(suite.get(key, '0'))
+          print('Native JUnit:', totals)
+          assert totals['tests'] >= 24 and totals['failures'] == totals['errors'] == 0
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: focusrelay-preview-apk
+          path: upstream/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
+

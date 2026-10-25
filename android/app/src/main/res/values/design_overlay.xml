@@ -1,0 +1,11 @@
+<!-- Modified by Rafail Andreou, 2026-10-26, for FocusRelay. Original notices retained. -->
+<resources>
+  <color name="design_canvas">#17191C</color><color name="design_panel">#23262B</color><color name="design_raised">#383D45</color>
+  <color name="design_text">#F1F0EA</color><color name="design_muted">#ADB2B9</color><color name="design_accent">#9BD2B2</color>
+  <string name="design_mindful">FocusRelay</string><string name="design_blocked_title">Blocked for now</string>
+  <string name="design_checkin_title">Time for a check-in</string><string name="design_go_home">Back to Home</string>
+  <string name="design_remind_again">Remind me again in</string>
+  <string name="design_other_limits">Your other rules and limits still apply.</string>
+  <string name="design_block_until">This block ends at %1$s.</string>
+  <string name="design_allowance_reset">Daily allowances reset at midnight.</string>
+</resources>

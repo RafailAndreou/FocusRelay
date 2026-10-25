@@ -1,0 +1,25 @@
+CREATE TABLE IF NOT EXISTS device (
+  id INTEGER PRIMARY KEY CHECK(id = 1),
+  revision INTEGER NOT NULL DEFAULT 0,
+  blocks TEXT NOT NULL DEFAULT '[]',
+  apps TEXT NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT '{}',
+  last_seen INTEGER NOT NULL DEFAULT 0,
+  applied_revision INTEGER NOT NULL DEFAULT -1
+);
+INSERT OR IGNORE INTO device(id) VALUES(1);
+CREATE TABLE IF NOT EXISTS oauth_clients (
+  id TEXT PRIMARY KEY,
+  redirect_uris TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS used_grants (
+  id TEXT PRIMARY KEY,
+  expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS rate_limits (
+  key TEXT PRIMARY KEY,
+  count INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+

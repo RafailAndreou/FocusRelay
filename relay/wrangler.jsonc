@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "focusrelay",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-10-26",
+  "workers_dev": true,
+  "observability": {
+    "enabled": false
+  },
+  "triggers": {
+    "crons": [
+      "17 3 * * *"
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "focusrelay",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
