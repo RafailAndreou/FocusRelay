@@ -4,6 +4,8 @@
 
 ### Make room for what matters.
 
+**[Download the Android APK](https://github.com/RafailAndreou/FocusRelay/releases/download/v1.6.0-preview.1/FocusRelay_1_6_0_arm64.apk)** · [Release notes & source](https://github.com/RafailAndreou/FocusRelay/releases/tag/v1.6.0-preview.1)
+
 An open-source Android app for blocking distractions, building healthier digital habits, and managing your focus—with optional AI remote control.
 
 [![Platform: Android](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)](docs/BUILD.md)
@@ -75,14 +77,14 @@ FocusRelay also retains Mindful's focus sessions, Bedtime, detailed usage statis
 
 ## Get started
 
-FocusRelay is currently a development preview. **A stable, maintainer-signed public APK release is not available yet.**
+**[Download FocusRelay 1.6.0 — Public Preview](https://github.com/RafailAndreou/FocusRelay/releases/tag/v1.6.0-preview.1)** for Android 7.0+ ARM64 devices. The release includes a signed APK, matching complete source and SHA-256 checksums.
 
-1. **Build or try a preview:** follow the [Android build guide](docs/BUILD.md). GitHub Actions can generate a test APK without a local Android development environment.
+1. **Install the app:** download `FocusRelay_1_6_0_arm64.apk` from the [public preview release](https://github.com/RafailAndreou/FocusRelay/releases/tag/v1.6.0-preview.1). Android may ask you to allow installation from your browser. Existing Design Preview users can update in place without uninstalling.
 2. **Grant the required permissions:** complete onboarding and enable Usage Access and Display over other apps. Review notification, battery and alarm settings where prompted.
 3. **Create your first block:** choose a nonessential app and try a short Quick Block. Check that you can use Home and Recents and that the block ends as expected.
 4. **Connect remote control, if you want it:** follow the [Cloudflare and MCP setup guide](docs/CLOUDFLARE_SETUP.md). You can use local features without this step.
 
-> GitHub Actions previews use a temporary debug signing certificate. They are for testing; installing one over a separately signed copy may fail. See the build guide before replacing an existing installation.
+> Public releases use a stable signing certificate. The 1.6.0 APK retains the Design Preview certificate and package ID. Raw GitHub Actions release artifacts are unsigned and need private signing before installation. To build your own copy, follow the [build guide](docs/BUILD.md).
 
 ## Privacy and control
 
