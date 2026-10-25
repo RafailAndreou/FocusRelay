@@ -63,11 +63,13 @@ android {
 
     buildTypes {
         release {
+            applicationIdSuffix System.getenv("MINDFUL_PREVIEW_SUFFIX") ?: ""
             ndk {
                 debugSymbolLevel 'full'
             }
             resValue "string", "app_name", "FocusRelay"
-            signingConfig signingConfigs.release
+            // CI builds unsigned; the private release key stays off the runner.
+            signingConfig System.getenv("FOCUSRELAY_UNSIGNED_RELEASE") == "true" ? null : signingConfigs.release
 
             // If you see "SigningConfig 'release' is missing required property 'storeFile'",  
             // it means your release keystore is not set up due to missing environment variables.  

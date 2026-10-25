@@ -2,9 +2,9 @@
 
 ## GitHub Actions (no Android development environment required)
 
-Fork this public source repository into your GitHub account. Open Actions → Build FocusRelay → Run workflow. The workflow checks out the pinned upstream, applies the overlay, runs relay, Flutter and Android checks and produces a debug APK and full application-source archive. Download artifacts only from a successful run of the source revision you intend to use.
+Fork this public source repository into your GitHub account. Open Actions → Build FocusRelay → Run workflow. The workflow checks out the pinned upstream, applies the overlay, runs relay, Flutter and Android checks and produces an unsigned release APK and full application-source archive. Download artifacts only from a successful run of the source revision you intend to use.
 
-The debug APK is a testing build. Its runner-generated debug certificate is not stable between runs. Do not use repeated CI debug artifacts as production updates. Keep the complete-source artifact alongside any redistributed APK, from the same run.
+The CI APK is unsigned and must be signed privately before installation. No release key or password is uploaded to the runner. Use a published maintainer-signed release for normal installation. Keep the complete-source artifact alongside any redistributed APK, from the same run.
 
 ## Local reconstruction
 
@@ -29,7 +29,7 @@ The installed label is FocusRelay. Existing package/namespace identifiers are de
 
 ## Release signing
 
-Generate and retain your own Android release keystore using the official [Flutter signing instructions](https://docs.flutter.dev/deployment/android#sign-the-app). Keep it private and backed up outside git. Set KEYSTORE_FILE to its absolute path, STORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD in your local build environment, then run flutter build apk --release with the version flags above. The release application ID is com.mindful.android.remote; the historical Design Preview package is com.mindful.android.remote.design. They are distinct installations.
+Generate and retain your own Android release keystore using the official [Flutter signing instructions](https://docs.flutter.dev/deployment/android#sign-the-app). Keep it private and backed up outside git. Set KEYSTORE_FILE to its absolute path, STORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD in your local build environment, then run flutter build apk --release with the version flags above. Without a suffix the release application ID is com.mindful.android.remote. Set MINDFUL_PREVIEW_SUFFIX=.design to retain the Design Preview identity com.mindful.android.remote.design; the public workflow uses this identity so a privately signed release can update Design Preview. FOCUSRELAY_UNSIGNED_RELEASE=true explicitly disables release signing for CI; omit it when signing through Gradle locally.
 
 Never publish the private keystore or passwords. Preserve a stable signing identity for every subsequent update. There is no signing secret in the public workflow.
 

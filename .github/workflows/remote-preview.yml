@@ -29,9 +29,10 @@ jobs:
           WRANGLER_SEND_METRICS: 'false'
   android:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       MINDFUL_PREVIEW_SUFFIX: '.design'
+      FOCUSRELAY_UNSIGNED_RELEASE: 'true'
       CI: 'true'
       FLUTTER_SUPPRESS_ANALYTICS: 'true'
       DART_SUPPRESS_ANALYTICS: 'true'
@@ -74,10 +75,9 @@ jobs:
         with:
           name: focusrelay-complete-source
           path: build/focusrelay-complete-source.tar.gz
-      - name: Build installable preview
-        # The SDK's debug signature is suitable for an initial private preview only.
-        # A stable personal release key is required before distributing updates.
-        run: flutter build apk --debug --target-platform android-arm64 --build-number=160 --build-name=1.6.0
+      - name: Build unsigned release for private signing
+        # No signing key or password is supplied to the runner.
+        run: flutter build apk --release --target-platform android-arm64 --build-number=160 --build-name=1.6.0
         working-directory: upstream
       - name: Test remote calendars, snapshots and foreground detection
         run: ./gradlew :app:testDebugUnitTest -Ptarget-platform=android-arm64
@@ -100,7 +100,7 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: focusrelay-preview-apk
-          path: upstream/build/app/outputs/flutter-apk/app-debug.apk
+          name: focusrelay-unsigned-release-apk
+          path: upstream/build/app/outputs/flutter-apk/*release*.apk
           retention-days: 14
 
