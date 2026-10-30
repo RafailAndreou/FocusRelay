@@ -30,8 +30,9 @@ void main() {
         .setMockMethodCallHandler(channel, (call) async {
           calls.add(call);
           if (call.method == 'modeState') return state;
-          if (call.method == 'modeSetup')
+          if (call.method == 'modeSetup') {
             state.addAll(Map<String, dynamic>.from(call.arguments as Map));
+          }
           if (call.method == 'emergencyEndModes') state['enabled'] = false;
           return true;
         });

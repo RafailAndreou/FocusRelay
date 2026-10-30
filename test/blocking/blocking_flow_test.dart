@@ -84,6 +84,8 @@ void main() {
     ) async {
       calls.add(call);
       switch (call.method) {
+        case 'modeState':
+          return <String, dynamic>{};
         case 'localApps':
           return apps;
         case 'status':
@@ -103,11 +105,12 @@ void main() {
             'activity': events,
           };
         case 'saveLocalRule':
-          if (failSave)
+          if (failSave) {
             throw PlatformException(
               code: 'SAVE',
               message: 'Could not save rules',
             );
+          }
           final r = RuleConfig.fromMap(
             Map<String, dynamic>.from((call.arguments as Map)['rule'] as Map),
           );
@@ -192,12 +195,15 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('four tabs and empty state use real navigation', (tester) async {
+  testWidgets('five tabs and empty state use real navigation', (tester) async {
     await mount(tester);
-    for (final label in ['Blocking', 'Rules', 'Activity', 'Settings']) {
+    for (final label in ['Blocking', 'Rules', 'Modes', 'Activity', 'Settings']) {
       expect(find.text(label), findsOneWidget);
     }
     expect(find.text('Your day is open'), findsOneWidget);
+    await tester.tap(find.text('Modes'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enable Device Modes'), findsOneWidget);
     await tester.tap(find.text('Rules'));
     await tester.pumpAndSettle();
     expect(find.text('Your rules'), findsOneWidget);

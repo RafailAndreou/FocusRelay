@@ -59,7 +59,7 @@ jobs:
         working-directory: upstream
       - run: dart run build_runner build --delete-conflicting-outputs
         working-directory: upstream
-      - run: flutter analyze lib/main.dart lib/config lib/core/extensions lib/ui/common lib/ui/dialogs lib/ui/onboarding lib/ui/permissions lib/ui/screens/blocking lib/ui/screens/focus/focus_mode lib/ui/screens/settings lib/ui/screens/remote_control lib/ui/screens/change_logs lib/ui/screens/websites_blocking lib/ui/splash_screen.dart lib/ui/transitions
+      - run: flutter analyze
         working-directory: upstream
       - run: flutter test test/remote test/blocking
         working-directory: upstream

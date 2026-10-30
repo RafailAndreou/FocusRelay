@@ -71,7 +71,7 @@ void main() {
       expect(tester.widget<FilledButton>(finish).onPressed, isNull);
       final locale = AppLocalizations.of(
         tester.element(find.byType(OnboardingScreen)),
-      )!;
+      );
       await tester.tap(find.text(locale.permission_usage_title));
       await tester.pumpAndSettle();
       expect(find.text(locale.permission_usage_info), findsOneWidget);
@@ -87,4 +87,3 @@ void main() {
     },
   );
 }
-
