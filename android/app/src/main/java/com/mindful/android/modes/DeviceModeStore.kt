@@ -69,10 +69,17 @@ object DeviceModeStore {
         check(p.edit().putString("events",a.toString()).commit())
     }
     fun audit(c: Context,e: RemoteEvaluation) {
-        val p=prefs(c);val previous=JSONObject(p.getString("phases","{}")!!);val phases=JSONObject()
+        val p=prefs(c);val previous=JSONObject(p.getString("phases","{}")!!);val phases=JSONObject();val now=System.currentTimeMillis();val intervals=JSONObject(p.getString("usage_intervals","{}")!!)
         for(s in e.modes?.states?:emptyList()) {
             val key=s.phase+":"+(s.window?.startAtMs?:0);val old=previous.optString(s.instance.id)
             phases.put(s.instance.id,key)
+            val history=intervals.optJSONArray(s.instance.id)?:JSONArray()
+            val last=if(history.length()>0)history.getJSONObject(history.length()-1)else null
+            if(last!=null&&!last.has("endAtMs")&&(s.phase!="active"||last.optLong("windowStart")!=s.window?.startAtMs)) {
+                last.put("endAtMs",minOf(now,last.getLong("windowEnd")))
+            }
+            if(s.phase=="active"&&(last==null||last.has("endAtMs")))history.put(JSONObject().put("startAtMs",maxOf(now,s.window!!.startAtMs)).put("windowStart",s.window.startAtMs).put("windowEnd",minOf(s.window.endAtMs,s.instance.expiresAtMs)))
+            intervals.put(s.instance.id,JSONArray((0 until history.length()).map{history.getJSONObject(it)}.takeLast(64)))
             if(key!=old){
                 val kind=when(s.phase){"active"->if(old.startsWith("paused:"))"mode_resumed" else "mode_activated";"paused"->"mode_paused";"expired","stopped","disabled"->"mode_ended";else->null}
                 if(kind!=null&&(s.phase in setOf("active","paused")||(old.startsWith("active:")||old.startsWith("paused:"))))event(c,kind,mapOf("instanceId" to s.instance.id),"mode-${s.instance.id}-${s.phase}-${s.window?.startAtMs?:old.substringAfter(':',"0")}-${RemoteStore.revision(c)}")
@@ -85,7 +92,8 @@ object DeviceModeStore {
         val oldExceptions=JSONObject(p.getString("exceptions","{}")!!);val active=JSONObject()
         for(x in e.modes?.exceptions?:emptyList()){active.put(x.id,x.untilMs);if(!oldExceptions.has(x.id))event(c,"temporary_exception_granted",mapOf("instanceId" to x.instanceId,"packageName" to x.packageName),"grant-${x.id}")}
         for(id in oldExceptions.keys().asSequence().toList())if(!active.has(id)&&oldExceptions.optLong(id)<=System.currentTimeMillis())event(c,"temporary_exception_expired",mapOf("reason" to id),"expire-$id")
-        check(p.edit().putString("phases",phases.toString()).putString("blocks",newBlocks.toString()).putString("exceptions",active.toString()).commit())
+        val ids=(e.modes?.states?:emptyList()).map{it.instance.id}.toSet();intervals.keys().asSequence().toList().filter{it !in ids}.forEach{intervals.remove(it)}
+        check(p.edit().putString("usage_intervals",intervals.toString()).putString("phases",phases.toString()).putString("blocks",newBlocks.toString()).putString("exceptions",active.toString()).commit())
     }
     fun report(c: Context,e: RemoteEvaluation): JSONObject=JSONObject().put("schemaVersion",1).put("enabled",enabled(c)).put("actionsConsent",actionsConsent(c)).put("usageSharing",usageSharing(c))
         .put("eligiblePackages",JSONArray(eligible(c).toList())).put("states",JSONArray((e.modes?.states?:emptyList()).map{JSONObject().put("id",it.instance.id).put("phase",it.phase)}))

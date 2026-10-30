@@ -17,6 +17,15 @@ data class UsageMeasurement(val appSeconds: Map<String,Long>,val screenSeconds: 
 object UsageMeasurementEngine {
     // Kinds are independent of Android constants so edge cases can be tested on the JVM.
     const val RESUME=1;const val PAUSE=2;const val SCREEN_ON=3;const val SCREEN_OFF=4
+    fun measureIntervals(events: List<UsagePoint>, intervals: List<Pair<Long,Long>>): UsageMeasurement {
+        val merged=mutableListOf<Pair<Long,Long>>()
+        for(w in intervals.filter{it.second>it.first}.sortedBy{it.first}) {
+            val last=merged.lastOrNull();if(last!=null&&w.first<=last.second)merged[merged.lastIndex]=last.first to maxOf(last.second,w.second)else merged.add(w)
+        }
+        val samples=merged.map{measure(events,it.first,it.second)};val apps=mutableMapOf<String,Long>()
+        for(s in samples)for((pkg,seconds)in s.appSeconds)apps[pkg]=(apps[pkg]?:0L)+seconds
+        return UsageMeasurement(apps,if(samples.any{it.screenSeconds==null})null else samples.sumOf{it.screenSeconds?:0L})
+    }
     fun measure(events: List<UsagePoint>,start: Long,end: Long): UsageMeasurement {
         require(end>=start)
         val opened=mutableMapOf<String,MutableSet<String>>();val since=mutableMapOf<String,Long>();val total=mutableMapOf<String,Long>()
@@ -55,7 +64,14 @@ object ModeUsage {
             val raw=RemoteStore.modeJson(c).optJSONArray("instances")?:JSONArray()
             val modes=JSONArray()
             val recent=(0 until raw.length()).map{raw.getJSONObject(it)}.filter{it.getJSONObject("timing").optString("type")=="once"&&it.getJSONObject("timing").getLong("startAtMs")<=now&&it.getLong("expiresAtMs")>now-7*MODE_DAY}.sortedByDescending{it.getLong("createdAtMs")}.take(4)
-            for(i in recent){val t=i.getJSONObject("timing");val start=t.getLong("startAtMs");val end=minOf(now,i.getLong("expiresAtMs"),i.optLong("stoppedAtMs",Long.MAX_VALUE));if(end>start)modes.put(sample(c,start,end,allowed).put("instanceId",i.getString("id")))}
+            val histories=JSONObject(DeviceModeStore.prefs(c).getString("usage_intervals","{}")!!)
+            for(i in recent){
+                val history=histories.optJSONArray(i.getString("id"))?:continue
+                val intervals=(0 until history.length()).map{history.getJSONObject(it)}.map{it.getLong("startAtMs") to minOf(now,it.optLong("endAtMs",it.getLong("windowEnd")))}.filter{it.second>it.first}
+                if(intervals.isEmpty())continue
+                val start=intervals.minOf{it.first};val end=intervals.maxOf{it.second}
+                modes.put(sample(c,start,end,allowed,intervals).put("instanceId",i.getString("id")).put("scope","observed_active_intervals").put("complete",false))
+            }
             JSONObject().put("available",true).put("collectedAtMs",now).put("today",sample(c,day,now,allowed)).put("modes",modes).also{cached=it;cachedAt=now}
         }catch(_: Exception){JSONObject().put("available",false).put("reason","android_usage_unavailable").put("collectedAtMs",now)}
     }
@@ -64,7 +80,7 @@ object ModeUsage {
         val modes=o.optJSONArray("modes")?:JSONArray();for(n in 0 until modes.length())intervals.add(modes.getJSONObject(n))
         for(i in intervals){val apps=i.getJSONArray("apps");i.put("apps",JSONArray((0 until apps.length()).map{apps.getJSONObject(it)}.filter{it.getString("packageName") in allowed}));i.put("complete",false)}
     }
-    private fun sample(c: Context,start: Long,end: Long,allowed: Set<String>): JSONObject {
+    private fun sample(c: Context,start: Long,end: Long,allowed: Set<String>,intervals: List<Pair<Long,Long>> = listOf(start to end)): JSONObject {
         val manager=c.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val data=manager.queryEvents(maxOf(0,start-MODE_DAY),end)?:throw IllegalStateException("No Android events")
         val points=mutableListOf<UsagePoint>()
@@ -74,7 +90,7 @@ object ModeUsage {
             if(kind!=0)points.add(UsagePoint(e.timeStamp,kind,e.packageName,e.className))
         }
         if(points.isEmpty())throw IllegalStateException("No Android event coverage")
-        val measurement=UsageMeasurementEngine.measure(points,start,end)
+        val measurement=UsageMeasurementEngine.measureIntervals(points,intervals)
         val apps=allowed.map{JSONObject().put("packageName",it).put("seconds",measurement.appSeconds[it]?:0L)}.sortedByDescending{it.getLong("seconds")}.take(50)
         return JSONObject().put("startAtMs",start).put("endAtMs",end).put("screenTimeSeconds",measurement.screenSeconds?:JSONObject.NULL).put("complete",allowed.size<=50).put("apps",JSONArray(apps))
     }

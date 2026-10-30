@@ -34,7 +34,7 @@ class DeviceModeMethodHandler(private val activity: Activity) {
         try{
             when(call.method){
                 "modeState"->{
-                    val e=RemoteStore.evaluation(activity);val o=JSONObject().put("connected",RemoteStore.enabled(activity)).put("enabled",DeviceModeStore.enabled(activity)).put("actionsConsent",DeviceModeStore.actionsConsent(activity)).put("usageSharing",DeviceModeStore.usageSharing(activity))
+                    val e=RemoteStore.evaluation(activity);val o=JSONObject().put("timeZone",ZoneId.systemDefault().id).put("connected",RemoteStore.enabled(activity)).put("enabled",DeviceModeStore.enabled(activity)).put("actionsConsent",DeviceModeStore.actionsConsent(activity)).put("usageSharing",DeviceModeStore.usageSharing(activity))
                         .put("exclusions",JSONArray(DeviceModeStore.excluded(activity).toList())).put("eligiblePackages",JSONArray(DeviceModeStore.eligible(activity).toList())).put("apps",JSONArray(RemoteStore.sharedApps(activity))).put("deviceModes",RemoteStore.modeJson(activity)).put("nextTransitionMs",e.nextTransitionMs?:JSONObject.NULL)
                         .put("permissions",JSONObject(DeviceModeActions.permissions(activity))).put("errors",JSONArray(DeviceModeActions.errors(activity)))
                         .put("instances",JSONArray((e.modes?.states?:emptyList()).map{s->JSONObject().put("id",s.instance.id).put("name",s.instance.name).put("mode",s.instance.mode).put("phase",s.phase).put("endAtMs",s.window?.endAtMs?:s.instance.expiresAtMs).put("allowedPackages",JSONArray(s.instance.allowedPackages.toList())).put("blockedPackages",JSONArray(s.blocked.toList())).put("alarmAtMs",s.instance.alarmAtMs?:JSONObject.NULL)}))

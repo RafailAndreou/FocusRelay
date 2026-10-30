@@ -46,7 +46,7 @@ export function validateUsage(u,apps){
   const max=Math.ceil((x.endAtMs-x.startAtMs)/1000);
   if(x.apps.some(a=>!a||!allowed.has(a.packageName)||!Number.isSafeInteger(a.seconds)||a.seconds<0||a.seconds>max))bad('Invalid app usage');
   if(x.screenTimeSeconds!==null&&(!Number.isSafeInteger(x.screenTimeSeconds)||x.screenTimeSeconds<0||x.screenTimeSeconds>max))bad('Invalid screen usage');
-  return {startAtMs:x.startAtMs,endAtMs:x.endAtMs,screenTimeSeconds:x.screenTimeSeconds,complete:x.complete===true,apps:x.apps.map(a=>({packageName:a.packageName,seconds:a.seconds})),launchCount:null,coverage:'estimated_from_android_events'};
+  return {startAtMs:x.startAtMs,endAtMs:x.endAtMs,screenTimeSeconds:x.screenTimeSeconds,complete:x.complete===true,apps:x.apps.map(a=>({packageName:a.packageName,seconds:a.seconds})),launchCount:null,coverage:'estimated_from_android_events',scope:x.scope==='observed_active_intervals'?'observed_active_intervals':'calendar_window'};
  };
  if(!Array.isArray(u.modes)||u.modes.length>4)bad('Too many usage windows');
  return {available:true,collectedAtMs:u.collectedAtMs,today:sample(u.today),modes:u.modes.map(m=>{if(typeof m.instanceId!=='string'||m.instanceId.length>80)bad('Invalid instance');return {instanceId:m.instanceId,...sample(m)};})};

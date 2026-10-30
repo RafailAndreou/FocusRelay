@@ -107,5 +107,6 @@
   "android/app/src/test/java/com/mindful/android/modes/DeviceModeEngineTest.kt",
   "android/app/src/test/java/com/mindful/android/modes/UsageMeasurementTest.kt",
   "android/app/src/test/java/com/mindful/android/modes/SettingOwnershipTest.kt",
-  "lib/ui/screens/blocking/device_modes.dart"
+  "lib/ui/screens/blocking/device_modes.dart",
+  "test/blocking/device_modes_test.dart"
 ]

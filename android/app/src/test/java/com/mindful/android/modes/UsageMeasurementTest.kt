@@ -5,6 +5,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class UsageMeasurementTest {
+    @org.junit.Test fun activeIntervalsExcludePausesAndMergeOverlaps() {
+        val events=listOf(UsagePoint(0,UsageMeasurementEngine.SCREEN_ON,null),UsagePoint(0,UsageMeasurementEngine.RESUME,"app"))
+        val sample=UsageMeasurementEngine.measureIntervals(events,listOf(0L to 10000L,5000L to 15000L,25000L to 30000L))
+        org.junit.Assert.assertEquals(20L,sample.appSeconds["app"])
+        org.junit.Assert.assertEquals(20L,sample.screenSeconds)
+    }
+
     @Test fun overlappingActivitiesAreNotDoubleCounted(){
         val events=listOf(UsagePoint(0,1,"a","one"),UsagePoint(1000,1,"a","two"),UsagePoint(2000,2,"a","one"),UsagePoint(3000,2,"a","two"))
         assertEquals(3L,UsageMeasurementEngine.measure(events,0,4000).appSeconds["a"])

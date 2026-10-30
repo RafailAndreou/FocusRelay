@@ -323,7 +323,7 @@ async function callTool(env, name, args) {
     if(name==='get_device_usage_summary')return {available:true,collectedAtMs:sample.collectedAtMs,deviceOnline:now()-row.last_seen<90000,...selection};
     if(!JSON.parse(row.apps).some(a=>a.packageName===args.packageName))fail(400,'Usage requires explicit app opt-in');
     const app=selection.apps.find(x=>x.packageName===args.packageName);
-    return {available:!!app||selection.complete,collectedAtMs:sample.collectedAtMs,packageName:args.packageName,seconds:app?.seconds??(selection.complete?0:null),launchCount:null,coverage:selection.coverage};
+    return {available:!!app||selection.complete,collectedAtMs:sample.collectedAtMs,packageName:args.packageName,seconds:app?.seconds??(selection.complete?0:null),launchCount:null,coverage:selection.coverage,scope:selection.scope};
   }
   fail(400,'Unknown tool');
 }

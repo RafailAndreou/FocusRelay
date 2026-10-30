@@ -59,6 +59,9 @@ jobs:
         working-directory: upstream
       - run: dart run build_runner build --delete-conflicting-outputs
         working-directory: upstream
+      - name: Test remote calendars, snapshots and foreground detection
+        run: ./gradlew :app:testDebugUnitTest -Ptarget-platform=android-arm64
+        working-directory: upstream/android
       - run: flutter analyze lib/main.dart lib/config lib/core/extensions lib/ui/common lib/ui/dialogs lib/ui/onboarding lib/ui/permissions lib/ui/screens/blocking lib/ui/screens/focus/focus_mode lib/ui/screens/settings lib/ui/screens/remote_control lib/ui/screens/change_logs lib/ui/screens/websites_blocking lib/ui/splash_screen.dart lib/ui/transitions
         working-directory: upstream
       - run: flutter test test/remote test/blocking
@@ -79,9 +82,6 @@ jobs:
         # No signing key or password is supplied to the runner.
         run: flutter build apk --release --target-platform android-arm64 --build-number=170 --build-name=1.7.0
         working-directory: upstream
-      - name: Test remote calendars, snapshots and foreground detection
-        run: ./gradlew :app:testDebugUnitTest -Ptarget-platform=android-arm64
-        working-directory: upstream/android
       - name: Summarize native regression tests
         working-directory: upstream
         run: |
