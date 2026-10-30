@@ -85,6 +85,7 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onStart() {
         super.onStart()
         com.mindful.android.localrules.LocalRuleScheduler.restore(this)
+        com.mindful.android.remote.RemoteScheduler.restore(this)
         if (RemoteStore.enabled(this)) runCatching { RemoteControlService.start(this) }
             .onFailure { RemoteStore.updateMessage(this, "Open remote control to reconnect") }
     }

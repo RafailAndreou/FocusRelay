@@ -49,7 +49,7 @@ class RemoteControlService : Service() {
         if (!started) {
             started = true
             executor.scheduleWithFixedDelay({ sync() }, 0, 15, TimeUnit.SECONDS)
-        }
+        } else if(intent?.action=="com.mindful.android.remote.SYNC_NOW") executor.execute{sync()}
         return START_STICKY
     }
     private fun notifyStatus(message: String) {
@@ -85,15 +85,20 @@ class RemoteControlService : Service() {
         try {
             val usage = PermissionsHelper.getAndAskUsageAccessPermission(this, false)
             val overlay = PermissionsHelper.getAndAskDisplayOverlayPermission(this, false)
-            val activeBlocks = RemoteStore.activeBlocks(this)
+            val evaluation = RemoteStore.evaluation(this)
+            val activeBlocks = evaluation.activeBlocks
             val trackerAvailable = Utils.isServiceRunning(this, MindfulTrackerService::class.java)
             val trackerReady = activeBlocks.isEmpty() || trackerAvailable
             val schedulerReady = RemoteStore.schedulerReady(this)
             val errors = RemoteStore.scheduleErrors(this)
             // Permission loss cannot produce a successful acknowledgment.
             val payload = JSONObject().put("apps", JSONArray(RemoteStore.sharedApps(this)))
+                .put("events", com.mindful.android.modes.DeviceModeStore.pendingEvents(this))
+                .put("stoppedInstanceIds", JSONArray(com.mindful.android.modes.DeviceModeStore.stopped(this).toList()))
                 .put("appliedRevision", if (usage && overlay && trackerReady && schedulerReady && errors.isEmpty()) RemoteStore.revision(this) else -1)
-                .put("status", JSONObject().put("schemaVersion", 2).put("usageAccess", usage).put("overlay", overlay).put("enabled", true)
+                .put("status", JSONObject().put("schemaVersion", 3)
+                    .put("deviceModes", com.mindful.android.modes.DeviceModeStore.report(this,evaluation))
+                    .put("usage", com.mindful.android.modes.ModeUsage.summary(this)).put("usageAccess", usage).put("overlay", overlay).put("enabled", true)
                     .put("trackerAvailable", trackerAvailable).put("serviceAvailable", !disposed).put("schedulerReady", schedulerReady)
                     .put("schedulerMode", RemoteStore.schedulerMode(this)).put("nextTransitionMs", RemoteStore.evaluation(this).nextTransitionMs ?: JSONObject.NULL)
                     .put("lastSuccessfulSyncMs", RemoteStore.lastSync(this)).put("clockSkewMs", RemoteStore.clockSkew(this))
@@ -112,7 +117,9 @@ class RemoteControlService : Service() {
             if (connection.responseCode != 200) throw IllegalStateException("Relay returned HTTP ${connection.responseCode}")
             val bytes = connection.inputStream.use { it.readBytesLimited(131072) }
             if (disposed || !RemoteStore.enabled(this)) return
-            val changed = try { RemoteStore.applyState(this, JSONObject(String(bytes, Charsets.UTF_8))) }
+            val responseJson=JSONObject(String(bytes, Charsets.UTF_8))
+            com.mindful.android.modes.DeviceModeStore.acknowledgeEvents(this,responseJson.optJSONArray("receivedEventIds"))
+            val changed = try { RemoteStore.applyState(this, responseJson) }
             catch(e: Exception) { RemoteStore.snapshotError(this, "Desired state rejected: ${e.message ?: e.javaClass.simpleName}"); throw e }
             val permissions = usage to overlay
             if (changed || lastPermissions != permissions) RemoteScheduler.restore(this)
@@ -137,6 +144,10 @@ class RemoteControlService : Service() {
     companion object {
         private const val CHANNEL = "mindful_remote_connection"
         private const val NOTIFICATION_ID = 7281
+        fun requestSync(context: Context) {
+            val intent=Intent(context,RemoteControlService::class.java).setAction("com.mindful.android.remote.SYNC_NOW")
+            if(Build.VERSION.SDK_INT>=26)context.startForegroundService(intent)else context.startService(intent)
+        }
         fun start(context: Context) {
             val intent = Intent(context, RemoteControlService::class.java)
             if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(intent) else context.startService(intent)

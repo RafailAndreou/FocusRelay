@@ -84,6 +84,8 @@ void main() {
     ) async {
       calls.add(call);
       switch (call.method) {
+        case 'modeState':
+          return <String, dynamic>{};
         case 'localApps':
           return apps;
         case 'status':
@@ -103,11 +105,12 @@ void main() {
             'activity': events,
           };
         case 'saveLocalRule':
-          if (failSave)
+          if (failSave) {
             throw PlatformException(
               code: 'SAVE',
               message: 'Could not save rules',
             );
+          }
           final r = RuleConfig.fromMap(
             Map<String, dynamic>.from((call.arguments as Map)['rule'] as Map),
           );
@@ -192,12 +195,40 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('four tabs and empty state use real navigation', (tester) async {
+  testWidgets('Modes expander and page scroll restore independently after tab changes', (tester) async {
+    await mount(tester, tab: 2, size: const Size(390, 600));
+    final page = find.byKey(const PageStorageKey('blocking-tab-2'));
+    await tester.drag(page, const Offset(0, -320));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Modes').last);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final controls = find.text('Device controls and privacy');
+    await tester.ensureVisible(controls);
+    await tester.tap(controls);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Share usage summaries'));
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Rules').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Modes').last);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(tester.widget<ExpansionTile>(find.byType(ExpansionTile)).key,
+        const PageStorageKey('device-mode-controls'));
+    await unmount(tester);
+  });
+  testWidgets('five tabs and empty state use real navigation', (tester) async {
     await mount(tester);
-    for (final label in ['Blocking', 'Rules', 'Activity', 'Settings']) {
+    for (final label in ['Blocking', 'Rules', 'Modes', 'Activity', 'Settings']) {
       expect(find.text(label), findsOneWidget);
     }
     expect(find.text('Your day is open'), findsOneWidget);
+    await tester.tap(find.text('Modes'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enable Device Modes'), findsOneWidget);
     await tester.tap(find.text('Rules'));
     await tester.pumpAndSettle();
     expect(find.text('Your rules'), findsOneWidget);

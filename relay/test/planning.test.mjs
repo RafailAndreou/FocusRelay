@@ -129,7 +129,7 @@ test('MCP discovery exposes typed object schemas without union conversion requir
   }
   if(schema.type==='array')walk(schema.items,path+'[]');
  };
- assert.equal(tools.length,15);
+ assert.equal(tools.length,31);
  for(const tool of tools)walk(tool.inputSchema,tool.name);
  const schema=tools.find(t=>t.name==='create_schedule').inputSchema.properties.timing;
  assert.deepEqual(schema.properties.type.enum,['once','weekly']);

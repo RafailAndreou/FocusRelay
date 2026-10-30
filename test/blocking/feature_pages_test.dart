@@ -24,11 +24,12 @@ import 'package:mindful/ui/onboarding/onboarding_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  if (Platform.isLinux)
+  if (Platform.isLinux) {
     open.overrideFor(
       OperatingSystem.linux,
       () => DynamicLibrary.open('libsqlite3.so.0'),
     );
+  }
   testWidgets('render and inspect migrated feature pages', (tester) async {
     tester.view.physicalSize = const Size(412, 892);
     tester.view.devicePixelRatio = 1;
@@ -75,19 +76,21 @@ void main() {
     final font = File(
       '${Platform.environment['FLUTTER_ROOT']}/bin/cache/artifacts/material_fonts/Roboto-Regular.ttf',
     );
-    if (font.existsSync())
+    if (font.existsSync()) {
       await (FontLoader('Roboto')..addFont(
             Future.value(ByteData.sublistView(font.readAsBytesSync())),
           ))
           .load();
+    }
     final materialIcons = File(
       '${Platform.environment['FLUTTER_ROOT']}/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
     );
-    if (materialIcons.existsSync())
+    if (materialIcons.existsSync()) {
       await (FontLoader('MaterialIcons')..addFont(
             Future.value(ByteData.sublistView(materialIcons.readAsBytesSync())),
           ))
           .load();
+    }
     final configFile = File('.dart_tool/package_config.json').absolute;
     final packages =
         (jsonDecode(configFile.readAsStringSync()) as Map)['packages'] as List;
@@ -154,8 +157,9 @@ void main() {
       await tester.runAsync(() async {
         await Future<void>.delayed(const Duration(milliseconds: 150));
       });
-      for (var i = 0; i < 8; i++)
+      for (var i = 0; i < 8; i++) {
         await tester.pump(const Duration(milliseconds: 300));
+      }
       expect(tester.takeException(), isNull, reason: route);
       await tester.runAsync(() async {
         final shot =
@@ -180,4 +184,3 @@ void main() {
     await tester.runAsync(db.close);
   });
 }
-

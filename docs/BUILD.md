@@ -17,8 +17,9 @@ python3 scripts/apply_overlay.py upstream
 cd upstream
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
+flutter analyze
 flutter test test/remote test/blocking
-flutter build apk --debug --target-platform android-arm64 --build-number=160 --build-name=1.6.0
+flutter build apk --debug --target-platform android-arm64 --build-number=171 --build-name=1.7.1
 cd android
 ./gradlew :app:testDebugUnitTest -Ptarget-platform=android-arm64
 ```

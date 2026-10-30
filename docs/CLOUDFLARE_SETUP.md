@@ -107,3 +107,7 @@ Pull new source, run npm ci, apply pending D1 migrations and redeploy with the s
 To stop using the service, disable remote control on the phone and disconnect AI integrations. The account owner can remove the Worker and database through Cloudflare after backing up anything needed. Deleting cloud resources is separate from uninstalling the Android app.
 
 Official references, checked 2026-10-26: [D1 getting started](https://developers.cloudflare.com/d1/get-started/), [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/), [Worker secrets](https://developers.cloudflare.com/workers/configuration/secrets/), [Wrangler commands](https://developers.cloudflare.com/workers/wrangler/commands/).
+
+## Device Modes extension
+
+The `device-modes` branch adds an additive D1 migration, schema-3 phone envelope and structured mode/exception/sequence/usage/history tools. Existing remote blocks, schedules, presets and OAuth/PKCE remain supported. See [Device Modes](device-modes/README.md), including upgrade order, local consent, acknowledgement, Android controls and the exact MCP schemas.
