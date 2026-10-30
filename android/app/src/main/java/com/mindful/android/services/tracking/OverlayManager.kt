@@ -136,7 +136,7 @@ class OverlayManager(
                 return@onUi
             }
             runCatching {
-                if (!haveOverlayPermission(context)) {
+                if (packageName in com.mindful.android.modes.ModeSafety.essential(context) || !haveOverlayPermission(context)) {
                     removeSheetOverlay()
                     return@onUi
                 }
@@ -161,6 +161,8 @@ class OverlayManager(
                 if (sheetOverlay == null) return@onUi
                 sheetOverlay.also {
                     LocalRules.recordBlock(context, packageName, restrictionState.groupName ?: restrictionState.type.name.lowercase().replace('_', ' '))
+                    if (restrictionState.type == RestrictionType.REMOTE)
+                        com.mindful.android.modes.DeviceModeStore.event(context,"blocked_app_opened",mapOf("packageName" to packageName))
                     if (restrictionState.type == RestrictionType.REMOTE)
                         RemoteStore.updateOverlayResult(context, "Blocking overlay shown: $packageName")
                     toastRequests.next()

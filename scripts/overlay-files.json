@@ -95,6 +95,17 @@
   "lib/ui/dialogs/input_field_dialog.dart",
   "lib/ui/common/sliver_distracting_apps_list.dart",
   "lib/ui/screens/websites_blocking/sliver_blocked_websites_list.dart",
-  "test/blocking/feature_pages_test.dart"
+  "test/blocking/feature_pages_test.dart",
+  "android/app/src/main/java/com/mindful/android/modes/DeviceModeMethodHandler.kt",
+  "android/app/src/main/java/com/mindful/android/modes/DeviceModeStore.kt",
+  "android/app/src/main/java/com/mindful/android/modes/DeviceModes.kt",
+  "android/app/src/main/java/com/mindful/android/modes/DeviceModeRuntime.kt",
+  "android/app/src/main/java/com/mindful/android/modes/ModeUsage.kt",
+  "android/app/src/main/java/com/mindful/android/modes/ModeSafety.kt",
+  "android/app/src/main/java/com/mindful/android/modes/DeviceModeActions.kt",
+  "android/app/src/main/java/com/mindful/android/modes/SettingOwnership.kt",
+  "android/app/src/test/java/com/mindful/android/modes/DeviceModeEngineTest.kt",
+  "android/app/src/test/java/com/mindful/android/modes/UsageMeasurementTest.kt",
+  "android/app/src/test/java/com/mindful/android/modes/SettingOwnershipTest.kt",
+  "lib/ui/screens/blocking/device_modes.dart"
 ]
-

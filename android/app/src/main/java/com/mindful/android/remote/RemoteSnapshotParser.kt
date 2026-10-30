@@ -28,7 +28,7 @@ object RemoteSnapshotParser {
         val result=values.map { it as String }.toSet();require(result.size==a.length()) { "Duplicate package" };return result
     }
     private fun pause(o: JSONObject): Long {val v=integer(o,"pausedUntilMs");require(v>=-1);return v}
-    private fun timing(o: JSONObject): RemoteTiming = when (o.getString("type")) {
+    fun timing(o: JSONObject): RemoteTiming = when (o.getString("type")) {
         "once" -> {
             val start=integer(o,"startAtMs");val end=integer(o,"endAtMs")
             require(start>=0 && end>start && end-start<=7L*86400000) { "Invalid one-time window" }
@@ -65,7 +65,7 @@ object RemoteSnapshotParser {
         }
         require(blocks.size==json.getJSONArray("blocks").length()) { "Duplicate immediate block" }
         if(!json.has("schemaVersion")){require(!requireV2) { "Refusing legacy snapshot after receiving schedules" };return RemoteSnapshot(revision,blocks,emptyList(),emptyList())}
-        require(integer(json,"schemaVersion")==2L) { "Unsupported desired schema" }
+        require(integer(json,"schemaVersion") in 2L..3L) { "Unsupported desired schema" }
         val presetObjects=items(json.getJSONArray("presets"),80)
         val presets=presetObjects.map { p ->
             val deleted=p.has("deletedAtMs")&&integer(p,"deletedAtMs")>0
@@ -83,7 +83,8 @@ object RemoteSnapshotParser {
             RemoteRule(text(r,"id"),text(r,"name"),packages(r.getJSONArray("packages"),allowed,deleted||disabled),timing(r.getJSONObject("timing")),parent,pause(r),deleted,disabled)
         }
         require(rules.map{it.id}.toSet().size==rules.size && rules.count{!it.deleted}<=64)
-        return RemoteSnapshot(revision,blocks,rules,presets)
+        val modes=if(integer(json,"schemaVersion")==3L)com.mindful.android.modes.DeviceModeParser.parse(json.getJSONObject("deviceModes"),allowed)else com.mindful.android.modes.DeviceModeState()
+        return RemoteSnapshot(revision,blocks,rules,presets,modes)
     }
 }
 

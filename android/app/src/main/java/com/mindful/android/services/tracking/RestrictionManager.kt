@@ -84,6 +84,7 @@ class RestrictionManager(
 
     // returns nearest time stamp for rechecking
     fun isAppRestricted(packageName: String): RestrictionState? {
+        if(packageName in com.mindful.android.modes.ModeSafety.essential(context))return null
         // If already restricted by focus or bedtime or cached
         val alreadyRestrictedState = evaluateIfAlreadyRestricted(packageName)
         if (alreadyRestrictedState != null) {

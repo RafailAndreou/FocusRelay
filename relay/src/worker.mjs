@@ -4,6 +4,8 @@
 import {PlanningError, readPlanning, mutatePlanning, pruneAllowlist, describePlanning, listPlanning, exactKeys} from './planning.mjs';
 import {evaluateRule} from './schedule-time.mjs';
 import {planningTools, planningOperations} from './planning-schemas.mjs';
+import {readModes,mutateModes,evaluateModes,reconcileModeOptIn,modeMutations} from './device-modes.mjs';
+import {modeTools,validateModeReport,validateUsage,validateEvents,saveEvents,queryEvents} from './mode-protocol.mjs';
 const SCOPE = 'mindful:control';
 const encoder = new TextEncoder();
 const MAX_BODY = 128 * 1024;
@@ -108,14 +110,48 @@ async function changePlanning(env,name,args) {
   }
   fail(409,'Concurrent update; retry');
 }
+function modeEligibility(phone,apps) {
+  const approved=new Set(phone.deviceModes?.eligiblePackages||[]);
+  return apps.filter(a=>approved.has(a.packageName));
+}
+function hasModeState(state) {return state.templates.length>0||state.instances.length>0||state.exceptions.length>0;}
+function modeSnapshot(row,phone) {return phone.schemaVersion===3?{...readPlanning(row),schemaVersion:3,deviceModes:readModes(row)}:readPlanning(row);}
+async function changeModes(env,name,args,fromDevice=false) {
+  for(let attempt=0;attempt<5;attempt++) {
+    const row=await deviceRow(env),phone=JSON.parse(row.status),state=readModes(row);
+    if(phone.schemaVersion!==3||!phone.deviceModes?.enabled)fail(409,'Enable Device Modes locally on an updated phone first');
+    const eligible=modeEligibility(phone,JSON.parse(row.apps));
+    const value=mutateModes(state,name,args,eligible);
+    snapshotFits(JSON.parse(row.blocks),{...readPlanning(row),deviceModes:state});
+    const r=await env.DB.prepare('UPDATE device SET assistant_state=?,revision=revision+1 WHERE id=1 AND revision=?').bind(JSON.stringify(state),row.revision).run();
+    if(r.meta.changes){
+      await saveEvents(env,[{id:'command-'+(row.revision+1),atMs:now(),kind:'command_accepted',details:{reason:name,revision:row.revision+1}}],fromDevice?'phone':'relay');
+      return {accepted:true,applied:false,revision:row.revision+1,desiredRevision:row.revision+1,appliedRevision:row.applied_revision,acknowledged:false,...value,message:'Mode desired state persisted; wait for a fresh phone acknowledgement and observation.'};
+    }
+  }
+  fail(409,'Concurrent mode update; retry');
+}
+async function stopLocallyEndedModes(env,ids) {
+  if(!Array.isArray(ids)||ids.length>128||ids.some(x=>typeof x!=='string'||x.length>80))fail(400,'Invalid stopped instance ids');
+  if(!ids.length)return;
+  for(let attempt=0;attempt<5;attempt++) {
+    const row=await deviceRow(env),state=readModes(row);let changed=false;
+    for(const i of state.instances)if(ids.includes(i.id)&&!i.stoppedAtMs){i.stoppedAtMs=now();changed=true;}
+    if(!changed)return;
+    const r=await env.DB.prepare('UPDATE device SET assistant_state=?,revision=revision+1 WHERE id=1 AND revision=?').bind(JSON.stringify(state),row.revision).run();
+    if(r.meta.changes)return;
+  }
+  fail(409,'Concurrent local stop; retry');
+}
 async function reconcileAllowlist(env,apps) {
   for (let attempt=0;attempt<5;attempt++) {
     const row=await deviceRow(env), state=readPlanning(row);
+    const modeState=readModes(row),modesChanged=reconcileModeOptIn(modeState,apps);
     const pruned=pruneAllowlist(state,JSON.parse(row.blocks),apps);
-    if (!pruned.changed && row.apps===JSON.stringify(apps)) return row;
+    if (!modesChanged && !pruned.changed && row.apps===JSON.stringify(apps)) return row;
     // Advertise the new allowlist atomically with any rule pruning, so a control
     // mutation cannot validate against the previous list between those writes.
-    const r=await env.DB.prepare('UPDATE device SET apps=?, blocks=?, remote_state=?, revision=revision+? WHERE id=1 AND revision=?').bind(JSON.stringify(apps),JSON.stringify(pruned.blocks),JSON.stringify(state),pruned.changed?1:0,row.revision).run();
+    const r=await env.DB.prepare('UPDATE device SET apps=?, blocks=?, remote_state=?, assistant_state=?, revision=revision+? WHERE id=1 AND revision=?').bind(JSON.stringify(apps),JSON.stringify(pruned.blocks),JSON.stringify(state),JSON.stringify(modeState),pruned.changed||modesChanged?1:0,row.revision).run();
     if(r.meta.changes) return deviceRow(env);
   }
   fail(409,'Allowlist changed concurrently; retry sync');
@@ -124,16 +160,23 @@ async function status(env) {
   const row=await deviceRow(env), time=now(), phone=JSON.parse(row.status), state=readPlanning(row);
   const acknowledged=row.applied_revision===row.revision;
   const recentlySeen=row.last_seen>0 && time-row.last_seen<90000;
-  const ready=recentlySeen && acknowledged && phone.enabled===true && phone.usageAccess===true && phone.overlay===true && phone.schemaVersion===2 && phone.trackerAvailable===true && phone.serviceAvailable===true && phone.schedulerReady===true && Math.abs(phone.clockSkewMs||0)<120000 && !(phone.scheduleErrors||[]).length && !(phone.enforcementErrors||[]).length;
+  const ready=recentlySeen && acknowledged && phone.enabled===true && phone.usageAccess===true && phone.overlay===true && [2,3].includes(phone.schemaVersion) && phone.trackerAvailable===true && phone.serviceAvailable===true && phone.schedulerReady===true && Math.abs(phone.clockSkewMs||0)<120000 && !(phone.scheduleErrors||[]).length && !(phone.enforcementErrors||[]).length;
+  const modeState=readModes(row),modeEvaluation=evaluateModes(modeState,new Set(modeEligibility(phone,JSON.parse(row.apps)).map(a=>a.packageName)),time);
+  const modeObserved=new Map((phone.deviceModes?.states||[]).map(x=>[x.id,x.phase]));
+  const confirmedModes=ready&&phone.deviceModes?.enabled?modeEvaluation.states.filter(x=>x.phase==='active'&&modeObserved.get(x.id)==='active'&&x.blockedPackagesNow.every(p=>(phone.activeBlocks||[]).some(b=>b.packageName===p&&b.untilMs>time))):[];
   const described=describePlanning(state,time,acknowledged,ready);
   const blocks=JSON.parse(row.blocks).filter(b=>b.untilMs>time);
   const desired=new Map(blocks.map(b=>[b.packageName,b.untilMs]));
   for(const rule of state.schedules){const e=evaluateRule(rule,state.presets,time);if(e.phase==='active')for(const p of rule.packages)desired.set(p,Math.max(desired.get(p)||0,e.active.endAtMs));}
+  if(phone.deviceModes?.enabled)for(const [pkg,end] of modeEvaluation.blocks)desired.set(pkg,Math.max(desired.get(pkg)||0,end));
   const activeRemoteBlocks=ready?(phone.activeBlocks||[]).filter(b=>b.untilMs>time && desired.has(b.packageName)).map(b=>({...b,untilMs:Math.min(b.untilMs,desired.get(b.packageName))})):[];
   const activePackages=new Set(activeRemoteBlocks.map(b=>b.packageName));
   for(const rule of described.schedules)if(rule.state==='active' && !rule.packages.every(p=>activePackages.has(p)))rule.state='pending';
   for(const preset of described.presets)if(preset.state==='active'&&!described.schedules.some(r=>r.presetId===preset.id&&r.state==='active'))preset.state='ready';
-  return {revision:row.revision,desiredRevision:row.revision,appliedRevision:row.applied_revision,acknowledged,
+  return {deviceModes:modeState.templates,modeInstances:modeEvaluation.states.map(x=>({...x,desiredPhase:x.phase,state:x.phase==='active'&&!confirmedModes.some(c=>c.id===x.id)?'pending':x.phase})),currentMode:confirmedModes[0]||null,activeModes:confirmedModes,activeRestrictions:activeRemoteBlocks,
+    activeTemporaryExceptions:ready&&phone.deviceModes?.enabled?modeEvaluation.activeExceptions.filter(x=>confirmedModes.some(i=>i.id===x.instanceId)):[],nextTransition:phone.nextTransitionMs>time?new Date(phone.nextTransitionMs).toISOString():null,
+    errors:[...(phone.scheduleErrors||[]),...(phone.enforcementErrors||[]),...(phone.deviceModes?.actionErrors||[])],modeCapabilities:phone.deviceModes||null,
+    revision:row.revision,desiredRevision:row.revision,appliedRevision:row.applied_revision,acknowledged,
     recentlySeen,deviceOnline:recentlySeen,lastSeen:row.last_seen?new Date(row.last_seen).toISOString():null,
     lastSuccessfulSync:phone.lastSuccessfulSyncMs?new Date(phone.lastSuccessfulSyncMs).toISOString():null,
     observedAt:row.last_seen?new Date(row.last_seen).toISOString():null,phone,blocks,activeRemoteBlocks,
@@ -146,10 +189,11 @@ function phoneStatus(phone,apps) {
   if(!phone || typeof phone.usageAccess!=='boolean'||typeof phone.overlay!=='boolean'||typeof phone.enabled!=='boolean')fail(400,'Missing permission status');
   const result={usageAccess:phone.usageAccess,overlay:phone.overlay,enabled:phone.enabled};
   if(phone.schemaVersion===undefined)return result;
-  if(phone.schemaVersion!==2)fail(400,'Unsupported phone schema');
+  if(![2,3].includes(phone.schemaVersion))fail(400,'Unsupported phone schema');
   for(const k of ['trackerAvailable','serviceAvailable','schedulerReady'])if(typeof phone[k]!=='boolean')fail(400,'Missing service/scheduler readiness');else result[k]=phone[k];
   if(!['exact','inexact','none','error'].includes(phone.schedulerMode))fail(400,'Invalid scheduler mode');
-  result.schedulerMode=phone.schedulerMode;result.schemaVersion=2;
+  result.schedulerMode=phone.schedulerMode;result.schemaVersion=phone.schemaVersion;
+  if(phone.schemaVersion===3){result.deviceModes=validateModeReport(phone.deviceModes,apps);if(result.deviceModes.usageSharing)result.usage=validateUsage(phone.usage,apps);}
   for(const k of ['nextTransitionMs','lastSuccessfulSyncMs']){if(phone[k]!==null&&(!Number.isSafeInteger(phone[k])||phone[k]<0))fail(400,'Invalid phone timestamp');result[k]=phone[k];}
   if(!Number.isSafeInteger(phone.clockSkewMs)||Math.abs(phone.clockSkewMs)>366*86400000)fail(400,'Invalid clock skew');result.clockSkewMs=phone.clockSkewMs;
   if(typeof phone.timeZone!=='string'||phone.timeZone.length>80)fail(400,'Invalid phone time zone');result.timeZone=phone.timeZone;
@@ -255,6 +299,7 @@ export const tools = [
   {name:'unblock_apps',description:'Remove only immediate timed remote blocks for the specified packages. Scheduled/preset rules remain; pause or delete their ids separately. Does not remove Mindful focus sessions, bedtime rules, or app limits. Pending until acknowledged.',inputSchema:{type:'object',properties:{packages:packageSchema},required:['packages'],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:true,idempotentHint:true,openWorldHint:false}},
   {name:'get_status',description:'Get structured heartbeat, timezone, permissions, tracker/scheduler readiness, desired/applied revision, observed active blocks, upcoming/paused schedules, presets, next local transition and errors. Only activeRemoteBlocks is confirmed by a recent phone observation. Desired activity is not enforcement; stale reports never count as active.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}},
   ...planningTools,
+  ...modeTools,
 ].map(t=>({...t,securitySchemes:[{type:'oauth2',scopes:[SCOPE]}],_meta:{securitySchemes:[{type:'oauth2',scopes:[SCOPE]}]}}));
 async function callTool(env, name, args) {
   if (name==='list_apps') {const row=await deviceRow(env); return {apps:JSON.parse(row.apps),lastSeen:row.last_seen,serverTime:new Date().toISOString()};}
@@ -264,6 +309,22 @@ async function callTool(env, name, args) {
   if(name==='list_schedules')return listPlanning(readPlanning(await deviceRow(env)),args);
   if(name==='list_presets'){exactKeys(args,['includeDeleted']);if(args.includeDeleted!==undefined&&typeof args.includeDeleted!=='boolean')fail(400,'includeDeleted must be boolean');return {presets:describePlanning(readPlanning(await deviceRow(env)),now()).presets.filter(p=>args.includeDeleted||!p.deletedAtMs)};}
   if(planningOperations.has(name))return changePlanning(env,name,args);
+  if(modeMutations.has(name))return changeModes(env,name,args);
+  if(name==='get_active_device_mode'){exactKeys(args,[]);return status(env);}
+  if(name==='list_device_modes'){exactKeys(args,[]);const row=await deviceRow(env);return {modes:readModes(row).templates,capabilities:JSON.parse(row.status).deviceModes||null};}
+  if(name==='list_temporary_exceptions'){exactKeys(args,['instanceId']);const row=await deviceRow(env);return {exceptions:readModes(row).exceptions.filter(e=>!args.instanceId||e.instanceId===args.instanceId),message:'Desired exceptions; get_status supplies observed state.'};}
+  if(name==='get_remote_activity_log')return queryEvents(env,args);
+  if(name==='get_device_usage_summary'||name==='get_app_usage'){
+    exactKeys(args,name==='get_app_usage'?['packageName','instanceId']:['instanceId']);
+    const row=await deviceRow(env),phone=JSON.parse(row.status),sample=phone.usage;
+    if(!phone.deviceModes?.usageSharing||!sample?.available)return {available:false,reason:'Usage sharing is disabled or Android data is unavailable',observedAt:sample?.collectedAtMs||null};
+    const selection=args.instanceId?sample.modes.find(x=>x.instanceId===args.instanceId):sample.today;
+    if(!selection)return {available:false,reason:'Session is not in the latest bounded phone sample',collectedAtMs:sample.collectedAtMs};
+    if(name==='get_device_usage_summary')return {available:true,collectedAtMs:sample.collectedAtMs,deviceOnline:now()-row.last_seen<90000,...selection};
+    if(!JSON.parse(row.apps).some(a=>a.packageName===args.packageName))fail(400,'Usage requires explicit app opt-in');
+    const app=selection.apps.find(x=>x.packageName===args.packageName);
+    return {available:!!app||selection.complete,collectedAtMs:sample.collectedAtMs,packageName:args.packageName,seconds:app?.seconds??(selection.complete?0:null),launchCount:null,coverage:selection.coverage};
+  }
   fail(400,'Unknown tool');
 }
 async function mcp(request, env) {
@@ -297,22 +358,33 @@ const relay = {
         await authorized(request,env,origin,true);
         const data=await jsonBody(request); const apps=validateApps(data.apps);
         const phone=phoneStatus(data.status,apps);
+        const events=phone.schemaVersion===3?validateEvents(data.events||[]):[];
+        if(phone.schemaVersion===3)await stopLocallyEndedModes(env,data.stoppedInstanceIds||[]);
         const row=await reconcileAllowlist(env,apps), planning=readPlanning(row);
         const needsV2=planning.schedules.length>0||planning.presets.length>0;
-        const capable=!needsV2||phone.schemaVersion===2;
-        const activeExpected=JSON.parse(row.blocks).some(b=>b.untilMs>now())||planning.schedules.some(r=>evaluateRule(r,planning.presets,now()).phase==='active');
-        const prepared=phone.schemaVersion!==2||(phone.serviceAvailable&&phone.schedulerReady&&!phone.scheduleErrors.length&&(!activeExpected||phone.trackerAvailable));
+        const needsV3=hasModeState(readModes(row));
+        const capable=(!needsV2||[2,3].includes(phone.schemaVersion))&&(!needsV3||phone.schemaVersion===3);
+        const modeActive=phone.schemaVersion===3&&phone.deviceModes.enabled&&evaluateModes(readModes(row),new Set(modeEligibility(phone,apps).map(a=>a.packageName))).blocks.size>0;
+        const activeExpected=modeActive||JSON.parse(row.blocks).some(b=>b.untilMs>now())||planning.schedules.some(r=>evaluateRule(r,planning.presets,now()).phase==='active');
+        const prepared=![2,3].includes(phone.schemaVersion)||(phone.serviceAvailable&&phone.schedulerReady&&!phone.scheduleErrors.length&&(!activeExpected||phone.trackerAvailable));
         const applied=capable&&prepared&&phone.usageAccess&&phone.overlay&&phone.enabled&&Number.isSafeInteger(data.appliedRevision)&&data.appliedRevision<=row.revision&&data.appliedRevision>=-1?data.appliedRevision:-1;
         await env.DB.prepare('UPDATE device SET apps=?, status=?, last_seen=?, applied_revision=? WHERE id=1').bind(JSON.stringify(apps),JSON.stringify(phone),now(),applied).run();
+        if(events.length)await saveEvents(env,events,'phone');
         const current=await deviceRow(env);
-        return response({revision:current.revision,blocks:JSON.parse(current.blocks).filter(b=>b.untilMs>now()),serverTimeMs:now(),...(phone.schemaVersion===2?readPlanning(current):{})});
+        return response({receivedEventIds:events.map(e=>e.id),revision:current.revision,blocks:JSON.parse(current.blocks).filter(b=>b.untilMs>now()),serverTimeMs:now(),...([2,3].includes(phone.schemaVersion)?modeSnapshot(current,phone):{})});
+      }
+      if(url.pathname==='/device/modes'&&request.method==='POST'){
+        await authorized(request,env,origin,true);await limited(env,request,'device-modes',30);
+        const data=await jsonBody(request);exactKeys(data,['operation','arguments']);
+        if(!modeMutations.has(data.operation))fail(400,'Unsupported phone mode operation');
+        return response(await changeModes(env,data.operation,data.arguments||{},true),202);
       }
       if(url.pathname==='/device/override'&&request.method==='POST'){
         await authorized(request,env,origin,true);await limited(env,request,'device-override',30);
         const data=await jsonBody(request);exactKeys(data,['operation','targetType','id','until']);
         if(!['pause_remote','resume_remote'].includes(data.operation))fail(400,'Only pause/resume are permitted from the phone');
         const {operation,...args}=data;await changePlanning(env,operation,args);
-        const row=await deviceRow(env);return response({revision:row.revision,blocks:JSON.parse(row.blocks).filter(b=>b.untilMs>now()),serverTimeMs:now(),...readPlanning(row)});
+        const row=await deviceRow(env);return response({revision:row.revision,blocks:JSON.parse(row.blocks).filter(b=>b.untilMs>now()),serverTimeMs:now(),...modeSnapshot(row,JSON.parse(row.status))});
       }
       await authorized(request,env,origin);
       if (url.pathname==='/mcp') return mcp(request,env);

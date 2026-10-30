@@ -36,10 +36,11 @@ object RemoteScheduler {
         val pending = PendingIntent.getBroadcast(context, 7282, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         alarm.cancel(pending)
         RemoteStore.invalidateEvaluation()
-        if (!RemoteStore.enabled(context)) return
-        val revision = RemoteStore.revision(context)
         val evaluation = RemoteStore.evaluation(context)
-        val next = evaluation.nextTransitionMs
+        com.mindful.android.modes.DeviceModeRuntime.reconcile(context,evaluation)
+        if (!RemoteStore.enabled(context) && !com.mindful.android.modes.DeviceModeActions.hasJournal(context)) return
+        val revision = RemoteStore.revision(context)
+        val next = listOfNotNull(evaluation.nextTransitionMs, if(com.mindful.android.modes.DeviceModeActions.hasJournal(context) && com.mindful.android.modes.DeviceModeActions.errors(context).isNotEmpty())System.currentTimeMillis()+60000 else null).minOrNull()
         var mode = "none"
         if (next != null) {
             mode = if (exactAllowed(context)) "exact" else "inexact"

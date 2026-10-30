@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mindful/config/navigation/app_routes.dart';
 import 'blocking_style.dart';
+import 'device_modes.dart';
 import 'rule_editor.dart';
 import 'rule_models.dart';
 
@@ -26,7 +27,7 @@ class _BlockingHomeState extends State<BlockingHome>
   void initState() {
     super.initState();
     c = widget.controller ?? BlockingController();
-    _tab = widget.initialTab.clamp(0, 3);
+    _tab = widget.initialTab.clamp(0, 4);
     c.addListener(_changed);
     WidgetsBinding.instance.addObserver(this);
     c.refresh();
@@ -114,6 +115,7 @@ class _BlockingHomeState extends State<BlockingHome>
                           [
                             'Your day',
                             'Your rules',
+                            'Modes',
                             'Activity',
                             'Settings',
                           ][_tab],
@@ -129,20 +131,21 @@ class _BlockingHomeState extends State<BlockingHome>
                           ),
                           SizedBox(height: 16),
                         ],
-                        if (_tab != 3 &&
+                        if (_tab != 4 &&
                             (!c.usagePermission || !c.overlayPermission)) ...[
                           _message(
                             'Finish permissions to enable blocking.',
                             Icons.shield_outlined,
                             action: 'Set up',
-                            onTap: () => setState(() => _tab = 3),
+                            onTap: () => setState(() => _tab = 4),
                           ),
                           SizedBox(height: 16),
                         ],
                         ...switch (_tab) {
                           0 => _blocking(context),
                           1 => _rules(context),
-                          2 => _activity(context),
+                          2 => [DeviceModesPanel()],
+                          3 => _activity(context),
                           _ => _settings(context),
                         },
                       ],
@@ -169,6 +172,7 @@ class _BlockingHomeState extends State<BlockingHome>
                   icon: Icon(Icons.format_list_bulleted),
                   label: 'Rules',
                 ),
+                NavigationDestination(icon: Icon(Icons.tune), label: 'Modes'),
                 NavigationDestination(
                   icon: Icon(Icons.bar_chart),
                   label: 'Activity',
@@ -690,7 +694,8 @@ class _BlockingHomeState extends State<BlockingHome>
                 Switch(
                   key: ValueKey('toggle-${e.rule.id}'),
                   value: c.pendingRuleToggles[e.rule.id] ?? e.rule.enabled,
-                  onChanged: c.busy || c.pendingRuleToggles.containsKey(e.rule.id)
+                  onChanged:
+                      c.busy || c.pendingRuleToggles.containsKey(e.rule.id)
                       ? null
                       : (v) => _act('toggleLocalRule', {
                           'id': e.rule.id,
@@ -1093,4 +1098,3 @@ class _BlockingHomeState extends State<BlockingHome>
     ),
   );
 }
-

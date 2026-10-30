@@ -50,9 +50,13 @@ object RemoteStore {
         return JSONObject().put("revision", maxOf(0, revision(context))).put("serverTimeMs", System.currentTimeMillis())
             .put("blocks", JSONArray(prefs(context).getString("blocks", "[]")))
     }
+    fun modeJson(context: Context): JSONObject = storedState(context).optJSONObject("deviceModes") ?: JSONObject().put("schemaVersion",1).put("templates",JSONArray()).put("instances",JSONArray()).put("exceptions",JSONArray())
     fun evaluation(context: Context, time: Long = System.currentTimeMillis()): RemoteEvaluation = synchronized(stateLock) {
         if (!enabled(context)) return@synchronized RemoteEvaluation(emptyMap(), emptyList(), null)
         val allowed = allowedPackages(context)
+        val modeEligible = com.mindful.android.modes.DeviceModeStore.eligible(context)
+        val modesEnabled = com.mindful.android.modes.DeviceModeStore.enabled(context)
+        val modeStopped = com.mindful.android.modes.DeviceModeStore.stopped(context)
         val currentText = prefs(context).getString("desired_state", null) ?: storedState(context).toString()
         if (snapshotText != currentText || parsedSnapshot == null) {
             // Local opt-out takes precedence immediately. Stored rules may still reference
@@ -66,13 +70,20 @@ object RemoteStore {
                     for (j in 0 until packages.length()) allPackages.add(packages.getString(j))
                 }
             }
+            source.optJSONObject("deviceModes")?.let { modes ->
+                for(key in listOf("templates","instances"))modes.optJSONArray(key)?.let { a ->
+                    for(n in 0 until a.length())a.getJSONObject(n).optJSONArray("blockedPackages")?.let { pkgs -> for(j in 0 until pkgs.length())allPackages.add(pkgs.getString(j)) }
+                }
+                modes.optJSONArray("exceptions")?.let { a -> for(n in 0 until a.length())allPackages.add(a.getJSONObject(n).getString("packageName")) }
+            }
             parsedSnapshot = RemoteSnapshotParser.parse(source, allPackages)
             snapshotText = currentText; cachedEvaluation = null
         }
         val cached = cachedEvaluation
-        if (cached != null && allowed == evaluatedAllowed && time >= evaluatedAt && time - evaluatedAt < 60000 && (cached.nextTransitionMs == null || time < cached.nextTransitionMs)) return@synchronized cached
-        RemoteRuleEngine.evaluate(parsedSnapshot!!, allowed, time).also { cachedEvaluation = it; evaluatedAt = time; evaluatedAllowed = allowed }
+        if (!sourceHasModes(currentText) && cached != null && allowed == evaluatedAllowed && time >= evaluatedAt && time - evaluatedAt < 60000 && (cached.nextTransitionMs == null || time < cached.nextTransitionMs)) return@synchronized cached
+        RemoteRuleEngine.evaluate(parsedSnapshot!!, allowed, time, modeEligible, modesEnabled, modeStopped).also { cachedEvaluation = it; evaluatedAt = time; evaluatedAllowed = allowed }
     }
+    private fun sourceHasModes(text: String) = text.contains("\"deviceModes\"")
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     fun enabled(context: Context) = prefs(context).getBoolean("enabled", false)
     fun setEnabled(context: Context, value: Boolean) { prefs(context).edit().putBoolean("enabled", value).commit() }
@@ -115,7 +126,7 @@ object RemoteStore {
         val elapsed = SystemClock.elapsedRealtime()
         cachedApps?.let { if (!refresh && elapsed - appsCachedAt < 5 * 60 * 1000L) return it }
         val pm = context.packageManager
-        val protected = ImpSystemAppsHelper.fetchImpApps(pm) + setOf(context.packageName, "com.android.settings", "com.android.systemui", "com.android.phone", "com.android.permissioncontroller", "com.google.android.permissioncontroller")
+        val protected = com.mindful.android.modes.ModeSafety.essential(context)
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val apps = pm.queryIntentActivities(intent, 0).mapNotNull { info ->
             val app = info.activityInfo.applicationInfo
@@ -127,7 +138,7 @@ object RemoteStore {
         appsCachedAt = elapsed
         return apps
     }
-    fun allowedPackages(context: Context): Set<String> = prefs(context).getStringSet("allowed", emptySet())?.toSet() ?: emptySet()
+    fun allowedPackages(context: Context): Set<String> = (prefs(context).getStringSet("allowed", emptySet())?.toSet() ?: emptySet()) - com.mindful.android.modes.ModeSafety.essential(context)
     @Synchronized
     fun setAllowed(context: Context, packages: Set<String>) {
         require(packages.isNotEmpty()) { "Select at least one app" }
@@ -146,6 +157,7 @@ object RemoteStore {
         if (!enabled(context)) return false
         require(json.toString().toByteArray(Charsets.UTF_8).size <= 131072) { "Desired snapshot too large" }
         val previous = prefs(context).getString("desired_state", null)?.let { JSONObject(it) }
+        if(previous?.optInt("schemaVersion")==3)require(json.optInt("schemaVersion")==3) { "Refusing mode schema downgrade" }
         var changed = false
         val wasUnready = !schedulerReady(context) || scheduleErrors(context).isNotEmpty()
         RemoteSnapshotParser.validateAndPersist(json, allowedPackages(context), revision(context), previous?.has("schemaVersion") == true) { parsed ->
@@ -189,6 +201,7 @@ object RemoteStore {
         "lastSync" to lastSync(context), "message" to (prefs(context).getString("message", "Not connected") ?: "Not connected"),
         "enforcement" to (prefs(context).getString("enforcement", "No blocking check yet") ?: "No blocking check yet"),
         "overlayResult" to (prefs(context).getString("overlay_result", "No remote overlay attempted yet") ?: "No remote overlay attempted yet"),
+        "deviceModes" to value(modeJson(context)), "modeStatus" to value(com.mindful.android.modes.DeviceModeStore.report(context,evaluation)),
         "schedules" to value(schedules), "presets" to value(state.optJSONArray("presets") ?: JSONArray()),
         "nextTransitionMs" to evaluation.nextTransitionMs, "schedulerMode" to schedulerMode(context),
         "schedulerReady" to schedulerReady(context), "scheduleErrors" to scheduleErrors(context),
