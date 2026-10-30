@@ -39,7 +39,6 @@ object DeviceModeStore {
         require(o.length()<128||o.has(id)) { "Local recovery limit reached; use emergency stop" }
         o.put(id,instance.getLong("expiresAtMs"))
         check(prefs(c).edit().putString("stopped",o.toString()).commit())
-        event(c,"mode_ended",mapOf("instanceId" to id,"reason" to "local_stop"))
         RemoteStore.invalidateEvaluation()
     }
     fun emergencyStop(c: Context) {

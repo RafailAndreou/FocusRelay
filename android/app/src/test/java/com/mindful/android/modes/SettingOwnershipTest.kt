@@ -5,6 +5,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SettingOwnershipTest {
+    @Test fun endingSnoozedOwnRuleReleasesHiddenTriggerWithoutRestoringGlobalDnd(){
+        val snoozed=SettingLease(0,1,true)
+        val ending=SettingOwnership.planOwnRule(snoozed,0,null)
+        assertEquals(0,ending.write);assertNull(ending.lease)
+        assertNull(SettingOwnership.plan(snoozed,0,null).write)
+        assertNull(SettingOwnership.planOwnRule(SettingLease(1,1),1,null).write)
+    }
+
     @Test fun baselineIsCapturedAndRestoredOnlyWhenLastOwnerEnds(){
         val start=SettingOwnership.plan(null,80,20);assertEquals(80,start.lease!!.baseline);assertEquals(20,start.write)
         val overlap=SettingOwnership.plan(start.lease,20,30);assertEquals(30,overlap.write);assertEquals(80,overlap.lease!!.baseline)

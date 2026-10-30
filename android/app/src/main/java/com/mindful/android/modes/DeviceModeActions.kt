@@ -70,7 +70,7 @@ object DeviceModeActions {
                     continue
                 }
                 if(old!=null)old=SettingOwnership.recover(old,observed,if(record?.has("pendingValue")==true)record.getInt("pendingValue")else null)
-                val plan=SettingOwnership.plan(old,observed,value)
+                val plan=if(key=="dnd")SettingOwnership.planOwnRule(old,observed,value)else SettingOwnership.plan(old,observed,value)
                 if(plan.write!=null){
                     // Do not clear a restore lease until the restore succeeds. Journal target intent before writing.
                     val pending=plan.lease?:old

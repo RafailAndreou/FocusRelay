@@ -62,6 +62,7 @@ function activate(s,t,opts,apps,now){
  const incoming={...opts};delete incoming.until;
  const base=Object.fromEntries(Object.entries(def).filter(([k])=>validKeys.includes(k)&&k!=='timing'&&def[k]!==null));
  if(!base.description)delete base.description;
+ if(opts.dnd!==undefined)delete base.notificationPolicy;
  if(opts.allowedPackages!==undefined&&opts.blockedPackages!==undefined)bad('Choose allowedPackages or blockedPackages');
  if(opts.allowedPackages!==undefined){base.mode='allow_list';base.blockedPackages=[];}
  if(opts.blockedPackages!==undefined){base.mode='block_list';base.allowedPackages=[];}
@@ -89,7 +90,7 @@ export function mutateModes(s,name,args,apps,now=Date.now()){
   if(name==='create_device_mode'&&modeId!==undefined)bad('Do not supply id for creation');
   const d=modeDefinition(definition,apps,now);
   if(name==='create_device_mode'){item={...d,id:id(),createdAtMs:now,updatedAtMs:now};s.templates.push(item);}
-  else {item=find(s,'templates',modeId);Object.assign(item,d,{updatedAtMs:now});}
+  else {const old=find(s,'templates',modeId);item={...d,id:old.id,createdAtMs:old.createdAtMs,updatedAtMs:now};s.templates=s.templates.map(t=>t.id===old.id?item:t);}
  }else if(name==='delete_device_mode'){
   exactKeys(args,['id']);item=find(s,'templates',args.id);s.templates=s.templates.filter(t=>t.id!==item.id);
   // Deleting a template does not mutate its already snapshotted activations.
@@ -118,6 +119,10 @@ export function mutateModes(s,name,args,apps,now=Date.now()){
   }
   if(cursor-start>MODE_LIMITS.maxDurationMs)bad('Sequence must last at most seven days');item={id:sequenceId,name:args.name,instances:steps};
  }else bad('Unknown mode operation');
+ const live=s.instances.filter(i=>!i.stoppedAtMs&&i.expiresAtMs>now);
+ const finished=s.instances.filter(i=>i.stoppedAtMs||i.expiresAtMs<=now).sort((a,b)=>(b.stoppedAtMs||b.expiresAtMs)-(a.stoppedAtMs||a.expiresAtMs));
+ s.instances=[...live,...finished.slice(0,Math.max(0,Math.min(8,MODE_LIMITS.instances-live.length)))];
+ const retained=new Set(s.instances.map(i=>i.id));s.exceptions=s.exceptions.filter(e=>retained.has(e.instanceId)&&!e.revokedAtMs&&e.untilMs>now);
  if(s.templates.length>MODE_LIMITS.templates||s.instances.length>MODE_LIMITS.instances||s.exceptions.length>MODE_LIMITS.exceptions)bad('Mode state limit reached; remove unused items');
  if(new TextEncoder().encode(JSON.stringify(s)).length>96*1024)bad('Mode state too large');
  return {item};

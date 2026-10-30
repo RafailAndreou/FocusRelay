@@ -405,6 +405,7 @@ const relay = {
       env.DB.prepare('DELETE FROM used_grants WHERE expires_at<?').bind(now()),
       env.DB.prepare('DELETE FROM rate_limits WHERE expires_at<?').bind(now()),
       env.DB.prepare('DELETE FROM oauth_clients WHERE created_at<?').bind(now()-180*86400000),
+      env.DB.prepare('DELETE FROM remote_events WHERE occurred_at<?').bind(now()-30*86400000),
     ]);
   }
 };

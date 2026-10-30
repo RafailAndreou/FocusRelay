@@ -70,7 +70,7 @@ export async function queryEvents(env,args){
  let cursorTime=to,cursorId='~';
  if(args.cursor!==undefined){if(typeof args.cursor!=='string'||!/^\d{1,16}:[-A-Za-z0-9_]{1,100}$/.test(args.cursor))bad('Invalid cursor');const p=args.cursor.indexOf(':');cursorTime=Number(args.cursor.slice(0,p));cursorId=args.cursor.slice(p+1);if(cursorTime<from||cursorTime>to)bad('Cursor outside range');}
  // first() reads one JSON aggregate, keeping the same D1 adapter contract used by old tests.
- const row=await env.DB.prepare('SELECT json_group_array(json_object(\'id\',id,\'atMs\',occurred_at,\'kind\',kind,\'source\',source,\'details\',json(details))) AS events FROM (SELECT * FROM remote_events WHERE occurred_at>=? AND occurred_at<? AND (occurred_at<? OR (occurred_at=? AND id<?)) ORDER BY occurred_at DESC,id DESC LIMIT ?)').bind(from,to,cursorTime,cursorTime,cursorId,limit+1).first();
+ const row=await env.DB.prepare('SELECT json_group_array(json_object(\'id\',id,\'atMs\',occurred_at,\'kind\',kind,\'source\',source,\'details\',json(details))) AS events FROM (SELECT * FROM remote_events WHERE occurred_at>=? AND occurred_at<? AND (occurred_at<? OR (occurred_at=? AND id<?)) ORDER BY occurred_at DESC,id DESC LIMIT ?)').bind(Math.max(from,Date.now()-30*86400000),to,cursorTime,cursorTime,cursorId,limit+1).first();
  const all=JSON.parse(row.events||'[]'),items=all.slice(0,limit),last=items.at(-1);
  return {items,nextCursor:all.length>limit?`${last.atMs}:${last.id}`:null,from:args.from,to:args.to,retentionDays:30};
 }

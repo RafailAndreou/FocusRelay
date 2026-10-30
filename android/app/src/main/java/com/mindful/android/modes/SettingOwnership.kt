@@ -6,6 +6,10 @@ data class SettingLease(val baseline: Int, val lastWritten: Int, val suppressed:
 data class SettingPlan(val lease: SettingLease?, val write: Int? = null, val event: String? = null)
 object SettingOwnership {
     fun recover(lease: SettingLease, observed: Int, pending: Int?): SettingLease = if(pending!=null&&observed==pending)lease.copy(lastWritten=observed)else lease
+    // Own DND rules have a hidden automatic trigger even while a user snoozes them.
+    // Release our trigger when the final owner ends; never change global DND policy.
+    fun planOwnRule(existing: SettingLease?, observed: Int, requested: Int?): SettingPlan =
+        if(existing!=null&&requested==null&&existing.baseline==0)SettingPlan(null,0,"device_action_restored") else plan(existing,observed,requested)
     fun plan(existing: SettingLease?, observed: Int, requested: Int?): SettingPlan {
         if(existing==null){
             if(requested==null)return SettingPlan(null)

@@ -52,7 +52,8 @@ class DeviceBootReceiver : BroadcastReceiver() {
                 try {
                     // Register channels before starting foreground services
                     NotificationHelper.registerNotificationChannels(context.applicationContext)
-                    RemoteScheduler.restore(context)
+                    val remoteRecovery = goAsync()
+                    RemoteScheduler.restore(context) { remoteRecovery.finish() }
                     com.mindful.android.localrules.LocalRuleScheduler.restore(context)
                     if (RemoteStore.enabled(context)) runCatching { RemoteControlService.start(context) }
 

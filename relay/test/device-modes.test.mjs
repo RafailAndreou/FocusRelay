@@ -5,7 +5,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import worker,{tools} from '../src/worker.mjs';
 import {emptyModes,mutateModes,evaluateModes} from '../src/device-modes.mjs';
-import {queryEvents,saveEvents} from '../src/mode-protocol.mjs';
+import {queryEvents,saveEvents,validateEvents,validateUsage,validateModeReport} from '../src/mode-protocol.mjs';
 const now=Date.parse('2026-10-30T10:00:00Z');
 const apps=[{packageName:'com.example.chat',label:'Chat'},{packageName:'com.example.video',label:'Video'},{packageName:'com.example.mail',label:'Mail'}];
 const eligible=new Set(apps.map(x=>x.packageName));
@@ -117,4 +117,44 @@ test('additive schema migration preserves old stored rules and credentials',()=>
 });
 test('MCP schemas are explicit, uniquely named, and keep all legacy tools',()=>{
  assert.equal(new Set(tools.map(t=>t.name)).size,tools.length);for(const n of ['block_apps','create_schedule','activate_preset','create_device_mode','grant_temporary_app_access','get_remote_activity_log'])assert.ok(tools.some(t=>t.name===n));
+});
+test('updating a template clears omitted actions without altering existing activations',()=>{
+ const s=emptyModes(),t=template(s,{dnd:true,brightness:30,mediaVolume:20}),active=activate(s,t);
+ const revised=mutateModes(s,'update_device_mode',{id:t.id,name:'Thesis',mode:'allow_list',allowedPackages:[apps[0].packageName],durationMinutes:60},apps,now+1000).item;
+ assert.equal(revised.dnd,undefined);assert.equal(revised.brightness,undefined);assert.equal(revised.mediaVolume,undefined);
+ assert.equal(active.dnd,true);assert.equal(active.brightness,30);assert.equal(activate(s,revised).dnd,undefined);
+});
+test('explicit dnd false overrides inherited alarms-only policy',()=>{
+ const s=emptyModes(),t=template(s,{notificationPolicy:'alarms_only'}),i=activate(s,t,{dnd:false});assert.equal(i.dnd,false);assert.equal(i.notificationPolicy,undefined);
+});
+test('malformed consent, unsupported telemetry and invasive event fields fail validation',()=>{
+ assert.throws(()=>validateModeReport({...report().deviceModes,enabled:'yes'},apps));
+ assert.throws(()=>validateModeReport({...report().deviceModes,eligiblePackages:['com.android.settings']},apps));
+ assert.throws(()=>validateEvents([{id:'x',atMs:Date.now(),kind:'mode_activated',details:{messageContent:'private'}}]));
+ assert.throws(()=>validateEvents([{id:'x',atMs:Date.now(),kind:'notification_content',details:{}}]));
+ assert.throws(()=>validateUsage({available:true,collectedAtMs:now,today:{startAtMs:now,endAtMs:now+60000,apps:[{packageName:apps[0].packageName,seconds:100}],screenTimeSeconds:0},modes:[]},apps));
+});
+test('phone endpoint cannot change opt-in, permissions or owner authorization',async()=>{
+ const e=env();await sync(e);
+ for(const operation of ['grant_permission','set_allowed_apps','rotate_owner_secret','create_device_mode']){
+  const args=operation==='create_device_mode'?{name:'Bad',mode:'block_list',packages:['com.android.settings']}:{enabled:true};
+  assert.equal((await api(e,'/device/modes',{operation,arguments:args},e.DEVICE_TOKEN)).status,400);
+ }
+});
+test('completed sessions and expired exceptions cannot permanently exhaust activation capacity',()=>{
+ const s=emptyModes(),t=template(s);let time=now;
+ for(let n=0;n<100;n++){
+  const i=mutateModes(s,'activate_device_mode',{id:t.id,durationMinutes:1},apps,time).item;
+  mutateModes(s,'grant_temporary_app_access',{instanceId:i.id,packageName:apps[1].packageName,durationMinutes:1},apps,time);
+  time+=120000;
+ }
+ assert.ok(s.instances.length<=9);assert.ok(s.exceptions.length<=1);
+ assert.ok(mutateModes(s,'activate_device_mode',{id:t.id,durationMinutes:1},apps,time).item);
+});
+test('history retention hides aged events even before the daily cleanup runs',async()=>{
+ const e=env(),time=Date.now(),old=time-30*86400000-1000;
+ e.DB.db.prepare('INSERT INTO remote_events VALUES(?,?,?,?,?)').run('old',old,'mode_ended','phone','{}');
+ const range={from:new Date(old-1000).toISOString(),to:new Date(old+1000).toISOString()};
+ assert.equal((await queryEvents(e,range)).items.length,0);
+ await worker.scheduled({},e);assert.equal(e.DB.db.prepare('SELECT count(*) AS n FROM remote_events').get().n,0);
 });
