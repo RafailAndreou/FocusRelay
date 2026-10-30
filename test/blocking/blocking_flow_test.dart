@@ -195,6 +195,31 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('Modes expander and page scroll restore independently after tab changes', (tester) async {
+    await mount(tester, tab: 2, size: const Size(390, 600));
+    final page = find.byKey(const PageStorageKey('blocking-tab-2'));
+    await tester.drag(page, const Offset(0, -320));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Modes').last);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final controls = find.text('Device controls and privacy');
+    await tester.ensureVisible(controls);
+    await tester.tap(controls);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Share usage summaries'));
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Rules').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Modes').last);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(tester.widget<ExpansionTile>(find.byType(ExpansionTile)).key,
+        const PageStorageKey('device-mode-controls'));
+    await unmount(tester);
+  });
   testWidgets('five tabs and empty state use real navigation', (tester) async {
     await mount(tester);
     for (final label in ['Blocking', 'Rules', 'Modes', 'Activity', 'Settings']) {

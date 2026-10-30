@@ -19,7 +19,7 @@ flutter pub get
 dart run build_runner build --delete-conflicting-outputs
 flutter analyze
 flutter test test/remote test/blocking
-flutter build apk --debug --target-platform android-arm64 --build-number=170 --build-name=1.7.0
+flutter build apk --debug --target-platform android-arm64 --build-number=171 --build-name=1.7.1
 cd android
 ./gradlew :app:testDebugUnitTest -Ptarget-platform=android-arm64
 ```

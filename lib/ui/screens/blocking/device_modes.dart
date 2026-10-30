@@ -443,6 +443,8 @@ class _DeviceModesPanelState extends State<DeviceModesPanel>
             ),
           ),
         ExpansionTile(
+          // Keep the boolean expansion state separate from the ListView scroll offset.
+          key: const PageStorageKey('device-mode-controls'),
           title: const Text('Device controls and privacy'),
           children: [
             SwitchListTile(
