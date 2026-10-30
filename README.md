@@ -50,11 +50,11 @@ Decide how much time you want to spend on selected apps each day. Give each app 
 
 ### A clear view of your focus
 
-Four tabs keep the essentials within reach:
+Five tabs keep the essentials within reach in the Device Modes build:
 
-| Blocking | Rules | Activity | Settings |
-|---|---|---|---|
-| Quick Block and today's timeline | Manage schedules and allowances | Review usage and recent blocking activity | Permissions, appearance and remote control |
+| Blocking | Rules | Modes | Activity | Settings |
+|---|---|---|---|---|
+| Quick Block and today's timeline | Schedules and allowances | Reusable modes, temporary access and emergency stop | Usage and blocking activity | Permissions and remote control |
 
 App icons help you recognize your selections at a glance. Compact icon groups show a **+N** count when more apps are selected.
 
@@ -70,6 +70,12 @@ Manage opted-in apps through a compatible AI assistant, including supported Chat
 Each relay is self-hosted on **Cloudflare Workers + D1** and serves one owner and one phone. You choose which apps are available to remote clients; essential phone controls are excluded. Remote commands require a connection to reach the phone. Once received, rules are stored and enforced locally, subject to Android's background restrictions.
 
 [Follow the step-by-step connection guide →](docs/CLOUDFLARE_SETUP.md)
+
+### Device Modes (development branch)
+
+Build `device-modes` to use reusable Sleep, Thesis, Deep Work or custom modes, dynamic allow-list restrictions, temporary app access, offline mode sequences, optional device controls and consent-based usage feedback. Templates and activations are independent; existing blocks/schedules remain supported. The linked 1.6.0 public APK predates this feature.
+
+[Device Modes setup, MCP schemas and Android limits](docs/device-modes/README.md) · [Samsung test checklist](docs/device-modes/SAMSUNG_TESTS.md)
 
 ### More tools for digital wellbeing
 
@@ -88,7 +94,7 @@ FocusRelay also retains Mindful's focus sessions, Bedtime, detailed usage statis
 
 ## Privacy and control
 
-Your local usage and activity data stays on your phone. Enabling remote control shares selected app names/package IDs, remote rules and connection diagnostics with **your configured relay** and makes relevant information available to authorized AI clients. No device token or shared relay credentials are bundled with the public source.
+Your local usage and activity data stays on your phone unless you separately enable Device Modes usage sharing. This optional feature shares selected-app duration estimates and bounded remote-control events with your own relay; it does not collect phone content. Enabling remote control shares selected app names/package IDs, remote rules and connection diagnostics with **your configured relay** and makes relevant information available to authorized AI clients. No device token or shared relay credentials are bundled with the public source.
 
 You can choose remote app access and disable remote control from the phone. Read the [privacy policy](PRIVACY.md) and [security notes](SECURITY.md) for details.
 

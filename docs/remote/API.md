@@ -166,3 +166,7 @@ the returned complete snapshot, prepares local alarms and acknowledges on sync.
 This button requires internet; a failed request leaves existing local rules intact.
 An accepted override whose response is lost may take effect on the next sync.
 
+
+## Device Modes extension
+
+The `device-modes` branch adds an additive D1 migration, schema-3 phone envelope and structured mode/exception/sequence/usage/history tools. Existing remote blocks, schedules, presets and OAuth/PKCE remain supported. See [Device Modes](../device-modes/README.md), including upgrade order, local consent, acknowledgement, Android controls and the exact MCP schemas.

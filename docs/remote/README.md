@@ -267,3 +267,7 @@ confirm discovery in the actual ChatGPT connection before claiming resolution.
   restoration still require physical-device checks. Automated tests and logical
   rule status do not establish that a blocking screen appeared on the phone.
 
+
+## Device Modes extension
+
+The `device-modes` branch adds an additive D1 migration, schema-3 phone envelope and structured mode/exception/sequence/usage/history tools. Existing remote blocks, schedules, presets and OAuth/PKCE remain supported. See [Device Modes](../device-modes/README.md), including upgrade order, local consent, acknowledgement, Android controls and the exact MCP schemas.

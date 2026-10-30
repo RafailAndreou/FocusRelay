@@ -25,7 +25,7 @@ object RemoteScheduler {
         val app = context.applicationContext
         worker.execute {
             try { reconcile(app) }
-            catch(e: Exception) { RemoteStore.schedulerError(app, "Local scheduler failed: ${e.javaClass.simpleName}") }
+            catch(e: Exception) { RemoteStore.schedulerError(app, "Local scheduler failed: ${e.javaClass.simpleName}");runCatching{com.mindful.android.modes.DeviceModeStore.event(app,"schedule_failed",mapOf("reason" to e.javaClass.simpleName))} }
             finally { completion?.invoke() }
         }
     }
