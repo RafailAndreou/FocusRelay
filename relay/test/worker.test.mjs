@@ -67,7 +67,7 @@ test('MCP initializes, lists scoped tools, and rejects tampered access tokens',a
   const e=env();const token=await sign({kind:'access',aud:origin,scope:'mindful:control',exp:Date.now()+60000},e.AUTH_SECRET);
   const rpc=body=>worker.fetch(request('/mcp',{method:'POST',token,body}),e);
   const init=await (await rpc({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18'}})).json();assert.equal(init.result.protocolVersion,'2025-06-18');
-  const listing=await (await rpc({jsonrpc:'2.0',id:2,method:'tools/list'})).json();assert.equal(listing.result.tools.length,31);assert.equal(listing.result.tools[0].securitySchemes[0].type,'oauth2');
+  const listing=await (await rpc({jsonrpc:'2.0',id:2,method:'tools/list'})).json();assert.equal(listing.result.tools.length,34);assert.equal(listing.result.tools[0].securitySchemes[0].type,'oauth2');
   assert.equal((await worker.fetch(request('/mcp',{method:'POST',token:token+'x',body:{jsonrpc:'2.0',id:1,method:'ping'}}),e)).status,401);
 });
 test('signed tokens reject incorrect audience, incorrect key, expiry and malformed input',async()=>{

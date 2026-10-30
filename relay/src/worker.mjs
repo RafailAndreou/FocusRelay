@@ -1,3 +1,4 @@
+import {alarmTools,alarmOperations,mutateAlarm,alarmStatus} from './alarms.mjs';
 // Modified by Rafail Andreou, 2026-10-26, for FocusRelay. Original notices retained.
 // SPDX-License-Identifier: GPL-2.0-only
 // Personal, single-device relay. No model calls, no usage-history collection.
@@ -114,14 +115,15 @@ function modeEligibility(phone,apps) {
   const approved=new Set(phone.deviceModes?.eligiblePackages||[]);
   return apps.filter(a=>approved.has(a.packageName));
 }
-function hasModeState(state) {return state.templates.length>0||state.instances.length>0||state.exceptions.length>0;}
+function hasModeState(state) {return state.templates.length>0||state.instances.length>0||state.exceptions.length>0||(state.alarms||[]).length>0;}
 function modeSnapshot(row,phone) {return phone.schemaVersion===3?{...readPlanning(row),schemaVersion:3,deviceModes:readModes(row)}:readPlanning(row);}
 async function changeModes(env,name,args,fromDevice=false) {
   for(let attempt=0;attempt<5;attempt++) {
     const row=await deviceRow(env),phone=JSON.parse(row.status),state=readModes(row);
     if(phone.schemaVersion!==3||!phone.deviceModes?.enabled)fail(409,'Enable Device Modes locally on an updated phone first');
     const eligible=modeEligibility(phone,JSON.parse(row.apps));
-    const value=mutateModes(state,name,args,eligible);
+    if(alarmOperations.has(name)||args.alarm?.enabled||args.alarmTime||((name==='activate_device_mode')&&(state.templates.find(t=>t.id===args.id)?.alarm?.enabled||state.templates.find(t=>t.id===args.id)?.alarmAtMs!==undefined))){if(phone.deviceModes?.alarmSupportVersion!==1||(name!=='cancel_alarm'&&!phone.deviceModes?.alarmConsent))fail(409,'Enable system alarm requests locally on an updated phone first');}
+    const value=alarmOperations.has(name)?mutateAlarm(state,name,args):mutateModes(state,name,args,eligible);
     snapshotFits(JSON.parse(row.blocks),{...readPlanning(row),deviceModes:state});
     const r=await env.DB.prepare('UPDATE device SET assistant_state=?,revision=revision+1 WHERE id=1 AND revision=?').bind(JSON.stringify(state),row.revision).run();
     if(r.meta.changes){
@@ -173,7 +175,7 @@ async function status(env) {
   const activePackages=new Set(activeRemoteBlocks.map(b=>b.packageName));
   for(const rule of described.schedules)if(rule.state==='active' && !rule.packages.every(p=>activePackages.has(p)))rule.state='pending';
   for(const preset of described.presets)if(preset.state==='active'&&!described.schedules.some(r=>r.presetId===preset.id&&r.state==='active'))preset.state='ready';
-  return {deviceModes:modeState.templates,modeInstances:modeEvaluation.states.map(x=>({...x,desiredPhase:x.phase,state:x.phase==='active'&&!confirmedModes.some(c=>c.id===x.id)?'pending':x.phase})),currentMode:confirmedModes[0]||null,activeModes:confirmedModes,activeRestrictions:activeRemoteBlocks,
+  return {...alarmStatus(modeState,phone,acknowledged,recentlySeen,time),deviceModes:modeState.templates,modeInstances:modeEvaluation.states.map(x=>({...x,desiredPhase:x.phase,state:x.phase==='active'&&!confirmedModes.some(c=>c.id===x.id)?'pending':x.phase})),currentMode:confirmedModes[0]||null,activeModes:confirmedModes,activeRestrictions:activeRemoteBlocks,
     activeTemporaryExceptions:ready&&phone.deviceModes?.enabled?modeEvaluation.activeExceptions.filter(x=>confirmedModes.some(i=>i.id===x.instanceId)):[],nextTransition:phone.nextTransitionMs>time?new Date(phone.nextTransitionMs).toISOString():null,
     errors:[...(phone.scheduleErrors||[]),...(phone.enforcementErrors||[]),...(phone.deviceModes?.actionErrors||[])],modeCapabilities:phone.deviceModes||null,
     revision:row.revision,desiredRevision:row.revision,appliedRevision:row.applied_revision,acknowledged,
@@ -300,6 +302,7 @@ export const tools = [
   {name:'get_status',description:'Get structured heartbeat, timezone, permissions, tracker/scheduler readiness, desired/applied revision, observed active blocks, upcoming/paused schedules, presets, next local transition and errors. Only activeRemoteBlocks is confirmed by a recent phone observation. Desired activity is not enforcement; stale reports never count as active.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}},
   ...planningTools,
   ...modeTools,
+  ...alarmTools,
 ].map(t=>({...t,securitySchemes:[{type:'oauth2',scopes:[SCOPE]}],_meta:{securitySchemes:[{type:'oauth2',scopes:[SCOPE]}]}}));
 async function callTool(env, name, args) {
   if (name==='list_apps') {const row=await deviceRow(env); return {apps:JSON.parse(row.apps),lastSeen:row.last_seen,serverTime:new Date().toISOString()};}
@@ -309,7 +312,8 @@ async function callTool(env, name, args) {
   if(name==='list_schedules')return listPlanning(readPlanning(await deviceRow(env)),args);
   if(name==='list_presets'){exactKeys(args,['includeDeleted']);if(args.includeDeleted!==undefined&&typeof args.includeDeleted!=='boolean')fail(400,'includeDeleted must be boolean');return {presets:describePlanning(readPlanning(await deviceRow(env)),now()).presets.filter(p=>args.includeDeleted||!p.deletedAtMs)};}
   if(planningOperations.has(name))return changePlanning(env,name,args);
-  if(modeMutations.has(name))return changeModes(env,name,args);
+  if(alarmOperations.has(name)||modeMutations.has(name))return changeModes(env,name,args);
+  if(name==='list_remote_alarms'){exactKeys(args,[]);const v=await status(env);return {alarms:v.alarms,nextRemoteAlarm:v.nextRemoteAlarm,desiredRevision:v.desiredRevision,appliedRevision:v.appliedRevision,acknowledged:v.acknowledged,deviceOnline:v.deviceOnline,observedAt:v.observedAt};}
   if(name==='get_active_device_mode'){exactKeys(args,[]);return status(env);}
   if(name==='list_device_modes'){exactKeys(args,[]);const row=await deviceRow(env);return {modes:readModes(row).templates,capabilities:JSON.parse(row.status).deviceModes||null};}
   if(name==='list_temporary_exceptions'){exactKeys(args,['instanceId']);const row=await deviceRow(env);return {exceptions:readModes(row).exceptions.filter(e=>!args.instanceId||e.instanceId===args.instanceId),message:'Desired exceptions; get_status supplies observed state.'};}
@@ -376,7 +380,7 @@ const relay = {
       if(url.pathname==='/device/modes'&&request.method==='POST'){
         await authorized(request,env,origin,true);await limited(env,request,'device-modes',30);
         const data=await jsonBody(request);exactKeys(data,['operation','arguments']);
-        if(!modeMutations.has(data.operation))fail(400,'Unsupported phone mode operation');
+        if(!modeMutations.has(data.operation)&&!alarmOperations.has(data.operation))fail(400,'Unsupported phone mode operation');
         return response(await changeModes(env,data.operation,data.arguments||{},true),202);
       }
       if(url.pathname==='/device/override'&&request.method==='POST'){

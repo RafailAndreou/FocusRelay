@@ -88,7 +88,7 @@ class RemoteMethodHandler(private val activity: Activity) : MethodChannel.Method
                         finishOnMain(result) { refreshTracker() }
                     } finally { connection.disconnect() }
                 }
-                else -> if(call.method in setOf("modeState","modeSetup","endModeLocally","emergencyEndModes","modePermission","confirmModeAlarm","modeCommand")) com.mindful.android.modes.DeviceModeMethodHandler(activity).handle(call,result) else com.mindful.android.localrules.LocalRuleMethods(activity).handle(call, result)
+                else -> if(call.method in setOf("modeState","modeSetup","endModeLocally","emergencyEndModes","modePermission","alarmConsent","launchRemoteAlarm","manageRemoteAlarm","modeCommand")) com.mindful.android.modes.DeviceModeMethodHandler(activity).handle(call,result) else com.mindful.android.localrules.LocalRuleMethods(activity).handle(call, result)
             }
         } catch (e: Exception) { result.error("REMOTE_CONTROL", e.message ?: "Remote control setup failed", null) }
     }

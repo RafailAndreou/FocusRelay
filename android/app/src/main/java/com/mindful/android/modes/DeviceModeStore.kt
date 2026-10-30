@@ -96,7 +96,7 @@ object DeviceModeStore {
     }
     fun report(c: Context,e: RemoteEvaluation): JSONObject=JSONObject().put("schemaVersion",1).put("enabled",enabled(c)).put("actionsConsent",actionsConsent(c)).put("usageSharing",usageSharing(c))
         .put("eligiblePackages",JSONArray(eligible(c).toList())).put("states",JSONArray((e.modes?.states?:emptyList()).map{JSONObject().put("id",it.instance.id).put("phase",it.phase)}))
-        .put("actionErrors",JSONArray(DeviceModeActions.errors(c))).put("alarmStatus",alarmStatus(c,e))
+        .put("alarmSupportVersion",1).put("alarmConsent",com.mindful.android.alarms.RemoteAlarms.consent(c)).put("alarms",com.mindful.android.alarms.RemoteAlarms.reports(c)).put("actionErrors",JSONArray(DeviceModeActions.errors(c))).put("alarmStatus",alarmStatus(c,e))
     private fun alarmStatus(c: Context,e: RemoteEvaluation): String {
         val alarms=(e.modes?.states?:emptyList()).filter{it.phase=="active"&&it.instance.alarmAtMs!=null}
         if(alarms.isEmpty())return "none"

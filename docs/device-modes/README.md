@@ -104,3 +104,5 @@ The remote activity log contains mode/block/exception/scheduler/action transitio
 See [architecture/schema rationale](DESIGN.md) and [Samsung test checklist](SAMSUNG_TESTS.md).
 
 Official references: [NotificationManager / own DND rules](https://developer.android.com/reference/android/app/NotificationManager), [Settings.System](https://developer.android.com/reference/android/provider/Settings.System), [AudioManager](https://developer.android.com/reference/android/media/AudioManager), [AlarmClock](https://developer.android.com/reference/android/provider/AlarmClock), [UsageStatsManager](https://developer.android.com/reference/android/app/usage/UsageStatsManager), [AlarmManager](https://developer.android.com/reference/android/app/AlarmManager).
+
+System Clock alarm requests: [ALARMS.md](ALARMS.md).
