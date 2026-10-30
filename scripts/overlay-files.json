@@ -108,5 +108,9 @@
   "android/app/src/test/java/com/mindful/android/modes/UsageMeasurementTest.kt",
   "android/app/src/test/java/com/mindful/android/modes/SettingOwnershipTest.kt",
   "lib/ui/screens/blocking/device_modes.dart",
-  "test/blocking/device_modes_test.dart"
+  "test/blocking/device_modes_test.dart",
+  "android/app/src/main/java/com/mindful/android/alarms/AlarmPolicy.kt",
+  "android/app/src/main/java/com/mindful/android/alarms/RemoteAlarms.kt",
+  "android/app/src/test/java/com/mindful/android/alarms/AlarmPolicyTest.kt",
+  "android/app/src/main/java/com/mindful/android/alarms/AlarmHandoff.kt"
 ]

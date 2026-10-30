@@ -89,6 +89,7 @@ object DeviceModeParser {
     }
     fun parse(o: JSONObject, allowed: Set<String>): DeviceModeState {
         require(number(o,"schemaVersion")==1L)
+        com.mindful.android.alarms.AlarmPolicy.validateAll(o.optJSONArray("alarms")?:JSONArray())
         val templates=o.getJSONArray("templates");require(templates.length()<=32)
         val templateIds=mutableSetOf<String>()
         for(n in 0 until templates.length()){val t=templates.getJSONObject(n);definition(t,allowed);require(templateIds.add(t.getString("id")))}

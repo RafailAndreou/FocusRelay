@@ -335,17 +335,6 @@ class _DeviceModesPanelState extends State<DeviceModesPanel>
                           onPressed: busy ? null : () => exception(i),
                           child: const Text('Temporary access'),
                         ),
-                      if (i['alarmAtMs'] != null && i['phase'] == 'active')
-                        TextButton(
-                          onPressed: busy
-                              ? null
-                              : () => invoke('confirmModeAlarm', {
-                                  'instanceId': i['id'],
-                                }),
-                          child: Text(
-                            'Set alarm ${time(i['alarmAtMs'])} in Clock',
-                          ),
-                        ),
                     ],
                   ),
                 ],
@@ -442,6 +431,26 @@ class _DeviceModesPanelState extends State<DeviceModesPanel>
               ),
             ),
           ),
+        SwitchListTile(
+          title: const Text('Allow system alarm requests'),
+          subtitle: const Text('Requests wait here until you open Clock. Enable device actions too. Clock owns ringing and cancellation.'),
+          value: state['alarmConsent'] == true,
+          onChanged: busy ? null : (v) => invoke('alarmConsent', {'enabled': v}),
+        ),
+        if (rows(state['alarms']).isNotEmpty) const Text('Requested alarms', style: TextStyle(fontSize: 22)),
+        for (final alarm in rows(state['alarms']))
+          ListTile(
+            title: Text('${alarm['label']} · ${time(alarm['triggerAtMs'])}'),
+            subtitle: Text('${alarm['state']} — system state unverified${alarm['error'] == null ? '' : '\n${alarm['error']}'}'),
+            trailing: Wrap(children: [
+              if (alarm['launchAttempted'] != true && (alarm['state'] == 'user_action_required' || alarm['state'] == 'failed') && alarm['cancelHandledAt'] == null)
+                TextButton(onPressed: busy ? null : () => invoke('launchRemoteAlarm', {'id': alarm['id']}), child: const Text('Open Clock')),
+              if (alarm['launchAttempted'] == true)
+                TextButton(onPressed: busy ? null : () => invoke('manageRemoteAlarm', {'id': alarm['id']}), child: const Text('Manage in Clock')),
+              if (alarm['cancelHandledAt'] == null && alarm['state'] != 'expired')
+                TextButton(onPressed: busy ? null : () => command('cancel_alarm', {'id': alarm['id']}), child: const Text('Cancel request')),
+            ]),
+          ),
         ExpansionTile(
           // Keep the boolean expansion state separate from the ListView scroll offset.
           key: const PageStorageKey('device-mode-controls'),
@@ -534,6 +543,9 @@ class DeviceModeEditor extends StatefulWidget {
 
 class _DeviceModeEditorState extends State<DeviceModeEditor> {
   late final TextEditingController name, minutes, description;
+  late final TextEditingController alarmLabel;
+  bool wakeAlarm = false;
+  DateTime? alarmAt;
   late String mode;
   late Set<String> selected;
   late Map<String, dynamic> actions;
@@ -544,6 +556,10 @@ class _DeviceModeEditorState extends State<DeviceModeEditor> {
     super.initState();
     final t = widget.template ?? {};
     name = TextEditingController(text: t['name'] ?? '');
+    final alarm = t['alarm'] as Map?;
+    wakeAlarm = alarm?['enabled'] == true;
+    alarmLabel = TextEditingController(text: alarm?['label'] as String? ?? 'Wake up');
+    alarmAt = DateTime.tryParse(alarm?['triggerAt'] as String? ?? '');
     description = TextEditingController(text: t['description'] ?? '');
     minutes = TextEditingController(text: '${t['durationMinutes'] ?? 60}');
     mode = t['mode'] ?? 'allow_list';
@@ -575,6 +591,7 @@ class _DeviceModeEditorState extends State<DeviceModeEditor> {
 
   @override
   void dispose() {
+    alarmLabel.dispose();
     name.dispose();
     minutes.dispose();
     description.dispose();
@@ -614,6 +631,7 @@ class _DeviceModeEditorState extends State<DeviceModeEditor> {
                         selected.toList(),
                     if (!scheduled) 'durationMinutes': int.parse(minutes.text),
                     if (scheduled) 'timing': timing,
+                    'alarm': {'enabled': wakeAlarm, if (wakeAlarm) 'label': alarmLabel.text.trim().isEmpty ? 'Wake up' : alarmLabel.text.trim(), if (wakeAlarm && alarmAt != null) 'triggerAt': alarmAt!.toUtc().toIso8601String()},
                     ...actions,
                   })
                 : null,
@@ -746,6 +764,28 @@ class _DeviceModeEditorState extends State<DeviceModeEditor> {
               ),
               onChanged: (_) => setState(() {}),
             ),
+          SwitchListTile(
+            title: const Text('Set wake-up alarm'),
+            subtitle: const Text('One-time modes only. Defaults to the mode end, rounded up to a minute. Open Modes to hand it to Clock.'),
+            value: wakeAlarm,
+            onChanged: (v) => setState(() { wakeAlarm = v; }),
+          ),
+          if (wakeAlarm) ...[
+            TextField(controller: alarmLabel, maxLength: 80, decoration: const InputDecoration(labelText: 'Alarm label')),
+            TextButton(
+              onPressed: () async {
+                final picked = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+                if (picked != null && mounted) {
+                  final now = DateTime.now();
+                  var at = DateTime(now.year, now.month, now.day, picked.hour, picked.minute);
+                  if (!at.isAfter(now)) at = DateTime(now.year, now.month, now.day + 1, picked.hour, picked.minute);
+                  setState(() { alarmAt = at; });
+                }
+              },
+              child: Text(alarmAt == null ? 'Choose a specific alarm time' : 'Alarm: ${alarmAt!.toLocal()}'),
+            ),
+            if (alarmAt != null) TextButton(onPressed: () => setState(() { alarmAt = null; }), child: const Text('Use mode end instead')),
+          ],
           const SizedBox(height: 16),
           const Text(
             'Optional device actions require local consent and Android permissions. Brightness requires manual brightness mode. Alarms are confirmed separately in Clock.',

@@ -2,7 +2,7 @@ name: Build FocusRelay
 on:
   workflow_dispatch:
   push:
-    branches: [main, master, remote-control, focusrelay-publication, device-modes]
+    branches: [main, master, remote-control, focusrelay-publication, device-modes, system-alarms]
 permissions:
   contents: read
 concurrency:
@@ -77,7 +77,7 @@ jobs:
           path: build/focusrelay-complete-source.tar.gz
       - name: Build unsigned release for private signing
         # No signing key or password is supplied to the runner.
-        run: flutter build apk --release --target-platform android-arm64 --build-number=171 --build-name=1.7.1
+        run: flutter build apk --release --target-platform android-arm64 --build-number=172 --build-name=1.7.2
         working-directory: upstream
       - name: Test remote calendars, snapshots and foreground detection
         run: ./gradlew :app:testDebugUnitTest -Ptarget-platform=android-arm64
