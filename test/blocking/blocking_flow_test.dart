@@ -207,6 +207,7 @@ void main() {
     expect(tester.takeException(), isNull);
     final controls = find.text('Device controls and privacy');
     await tester.ensureVisible(controls);
+    await tester.pumpAndSettle();
     await tester.tap(controls);
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Share usage summaries'));
