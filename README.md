@@ -115,3 +115,11 @@ The FocusRelay changes are maintained by **Rafail Andreou** and add the redesign
 FocusRelay is distributed under **GNU GPL version 2**. Original notices are retained. See [LICENSE](LICENSE), [attribution](NOTICE.md), [third-party notices](THIRD_PARTY_NOTICES.md) and the [modification record](MODIFICATIONS.md).
 
 For developers: this repository applies a source overlay to a pinned Mindful commit. The build guide explains reconstruction, and the workflow packages complete corresponding source to distribute alongside the matching APK.
+
+### System alarm requests
+
+The alarm extension adds `set_alarm`, `list_remote_alarms` and `cancel_alarm`. It delegates to Android Clock after a local foreground handoff, tracks only its own requests and never claims confirmed system creation. See [setup, API, limitations and Samsung tests](docs/device-modes/ALARMS.md).
+
+### Automatic wake-up alarms
+
+In 1.7.3, new remote alarms default to FocusRelay-owned automatic ringing after one-time local consent and Android permission setup. See [setup, limitations and Samsung tests](docs/device-modes/AUTOMATIC_ALARMS.md). The optional Clock handoff remains available explicitly.

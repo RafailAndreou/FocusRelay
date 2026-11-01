@@ -158,4 +158,19 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+  testWidgets('automatic alarm setup and local dismiss use their own native actions', (tester) async {
+    state['automaticAlarmConsent'] = false;
+    state['alarms'] = [{'id': 'alarm-owned', 'label': 'Wake up', 'delivery': 'focusrelay', 'state': 'ringing', 'triggerAtMs': DateTime.now().millisecondsSinceEpoch}];
+    await panel(tester);
+    await tester.ensureVisible(find.text('Allow automatic FocusRelay alarms'));
+    await tester.tap(find.text('Allow automatic FocusRelay alarms'));
+    await tester.pumpAndSettle();
+    expect(calls.lastWhere((c) => c.method == 'automaticAlarmConsent').arguments, {'enabled': true});
+    await tester.ensureVisible(find.text('Dismiss locally'));
+    await tester.tap(find.text('Dismiss locally'));
+    await tester.pumpAndSettle();
+    expect(calls.lastWhere((c) => c.method == 'dismissOwnedAlarm').arguments, {'id': 'alarm-owned'});
+    expect(find.text('Open Clock'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
 }

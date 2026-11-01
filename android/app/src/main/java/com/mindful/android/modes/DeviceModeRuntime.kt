@@ -6,6 +6,7 @@ import com.mindful.android.remote.RemoteEvaluation
 
 object DeviceModeRuntime {
     @Synchronized fun reconcile(c: Context,e: RemoteEvaluation) {
+        com.mindful.android.alarms.RemoteAlarms.reconcile(c)
         DeviceModeStore.audit(c,e)
         DeviceModeActions.reconcile(c,e)
     }

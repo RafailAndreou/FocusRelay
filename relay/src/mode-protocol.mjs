@@ -1,10 +1,11 @@
+import {alarmSchema,validateAlarmReports} from './alarms.mjs';
 // Copyright 2026 Rafail Andreou. SPDX-License-Identifier: GPL-2.0-only
 import {PlanningError,exactKeys,instant} from './planning.mjs';
 const obj=(properties,required=[])=>({type:'object',properties,required,additionalProperties:false});
 const id={type:'string',minLength:1,maxLength:80},stamp={type:'string',format:'date-time'},list={type:'array',items:{type:'string',maxLength:255},maxItems:500,uniqueItems:true};
 const durationMinutes={type:'integer',minimum:1,maximum:10080};
 const timing={type:'object',properties:{type:{type:'string',enum:['once','weekly']},startAt:stamp,endAt:stamp,timeZone:{type:'string'},daysOfWeek:{type:'array',items:{type:'integer',minimum:1,maximum:7},minItems:1,maxItems:7},startTime:{type:'string'},endTime:{type:'string'},startDate:{type:'string',format:'date'},endDate:{type:'string',format:'date'}},required:['type'],additionalProperties:false};
-const actions={dnd:{type:'boolean'},brightness:{type:'integer',minimum:5,maximum:100},mediaVolume:{type:'integer',minimum:0,maximum:100},ringtoneVolume:{type:'integer',minimum:1,maximum:100},alarmTime:stamp};
+const actions={alarm:alarmSchema,dnd:{type:'boolean'},brightness:{type:'integer',minimum:5,maximum:100},mediaVolume:{type:'integer',minimum:0,maximum:100},ringtoneVolume:{type:'integer',minimum:1,maximum:100},alarmTime:stamp};
 const definition={name:{type:'string',minLength:1,maxLength:80},icon:{type:'string',maxLength:24},description:{type:'string',maxLength:500},mode:{type:'string',enum:['block_list','allow_list']},packages:list,blockedPackages:list,allowedPackages:list,excludedPackages:list,durationMinutes,timing,...actions,notificationPolicy:{type:'string',enum:['unchanged','alarms_only']}};
 const tool=(name,description,properties,required=[],readOnly=false)=>({name,description,inputSchema:obj(properties,required),annotations:{readOnlyHint:readOnly,destructiveHint:name.startsWith('delete'),openWorldHint:false}});
 export const modeTools=[
@@ -12,7 +13,7 @@ export const modeTools=[
  tool('update_device_mode','Replace a mode template by id; existing activation snapshots are unchanged. Supply the complete name and access configuration.',{id,...definition},['id','name','mode']),
  tool('delete_device_mode','Delete a reusable template. Existing activation instances remain independent; stop them separately.',{id},['id']),
  tool('list_device_modes','List reusable templates and phone capabilities. Does not activate anything.',{},[],true),
- tool('activate_device_mode','Activate a mode as a separate instance. Choose durationMinutes or until, or its saved timing. allowedPackages switches this activation to allow_list. Optional device actions require separate local consent/Android permissions. Alarm requests require local Clock confirmation. Accepted is not enforced; check status.',{id,durationMinutes,until:stamp,allowedPackages:list,blockedPackages:list,...actions},['id']),
+ tool('activate_device_mode','Activate a mode as a separate instance. Choose durationMinutes or until, or its saved timing. allowedPackages switches this activation to allow_list. Optional device actions require separate local consent/Android permissions. Automatic alarms require explicit local consent and exact-alarm/notification access; only delivery system_clock needs foreground Clock confirmation. Accepted is not enforced; check status.',{id,durationMinutes,until:stamp,allowedPackages:list,blockedPackages:list,...actions},['id']),
  tool('stop_device_mode','End one mode instance; other overlapping restrictions remain.',{instanceId:id},['instanceId']),
  tool('pause_device_mode','Pause one mode without extending its end time or weakening other rules.',{instanceId:id},['instanceId']),
  tool('resume_device_mode','Resume one paused, unexpired mode instance without restarting it.',{instanceId:id},['instanceId']),
@@ -35,7 +36,7 @@ export function validateModeReport(value,apps){
  packages(value.eligiblePackages);
  if(!Array.isArray(value.states)||value.states.length>64||value.states.some(x=>!x||typeof x.id!=='string'||x.id.length>80||!['active','scheduled','paused','expired','stopped','disabled'].includes(x.phase)))bad('Invalid mode states');
  if(!Array.isArray(value.actionErrors)||value.actionErrors.length>16||value.actionErrors.some(e=>typeof e!=='string'||e.length>200))bad('Invalid action errors');
- return {schemaVersion:1,enabled:value.enabled,actionsConsent:value.actionsConsent,usageSharing:value.usageSharing,eligiblePackages:value.eligiblePackages,states:value.states.map(x=>({id:x.id,phase:x.phase})),actionErrors:value.actionErrors,alarmStatus:value.alarmStatus==='needs_user_confirmation'?'needs_user_confirmation':value.alarmStatus==='handed_to_clock'?'handed_to_clock':'none'};
+ return {automaticAlarmConsent:value.automaticAlarmConsent===true,automaticAlarmReady:value.automaticAlarmReady===true,alarmSupportVersion:[1,2].includes(value.alarmSupportVersion)?value.alarmSupportVersion:0,alarmConsent:value.alarmConsent===true,alarms:validateAlarmReports(value.alarms),schemaVersion:1,enabled:value.enabled,actionsConsent:value.actionsConsent,usageSharing:value.usageSharing,eligiblePackages:value.eligiblePackages,states:value.states.map(x=>({id:x.id,phase:x.phase})),actionErrors:value.actionErrors,alarmStatus:value.alarmStatus==='needs_user_confirmation'?'needs_user_confirmation':value.alarmStatus==='handed_to_clock'?'handed_to_clock':'none'};
 }
 export function validateUsage(u,apps){
  if(!u||typeof u.available!=='boolean'||!Number.isSafeInteger(u.collectedAtMs)||u.collectedAtMs<0)bad('Invalid usage sample');

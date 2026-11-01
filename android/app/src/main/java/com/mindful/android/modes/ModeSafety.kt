@@ -4,6 +4,7 @@ package com.mindful.android.modes
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.provider.AlarmClock
 import android.provider.Telephony
 import android.view.inputmethod.InputMethodManager
 import com.mindful.android.helpers.device.ImpSystemAppsHelper
@@ -13,10 +14,13 @@ object ModeSafety {
     val essentialNames = setOf("android", "com.android.settings", "com.android.systemui", "com.android.phone",
         "com.android.server.telecom", "com.android.permissioncontroller", "com.google.android.permissioncontroller",
         "com.google.android.packageinstaller", "com.android.packageinstaller", "com.samsung.android.dialer",
-        "com.samsung.android.incallui", "com.google.android.dialer", "com.android.emergency")
+        "com.samsung.android.incallui", "com.google.android.dialer", "com.android.emergency", "com.sec.android.app.clockpackage", "com.google.android.deskclock", "com.android.deskclock")
     fun essential(context: Context): Set<String> {
         val result=essentialNames + context.packageName + ImpSystemAppsHelper.fetchImpApps(context.packageManager)
         val extras=mutableSetOf<String>()
+        for(action in listOf(AlarmClock.ACTION_SET_ALARM,AlarmClock.ACTION_SHOW_ALARMS))runCatching{
+            context.packageManager.queryIntentActivities(Intent(action),0).forEach{extras.add(it.activityInfo.packageName)}
+        }
         Telephony.Sms.getDefaultSmsPackage(context)?.let{extras.add(it)}
         runCatching{(context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).enabledInputMethodList.forEach{extras.add(it.packageName)}}
         return result+extras
