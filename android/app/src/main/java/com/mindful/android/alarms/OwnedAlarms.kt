@@ -58,7 +58,7 @@ object OwnedAlarms {
         require(all.length()<=64){"Local alarm metadata limit reached"};save(c,all);return JSONObject(a.toString())
     }
     @Synchronized fun get(c: Context,id: String): JSONObject?=records(c).optJSONObject(id)?.let{JSONObject(it.toString())}
-    @Synchronized fun mark(c: Context,id: String,state: String,error: String?=null){val all=records(c);val a=all.optJSONObject(id)?:return;a.put("state",state).put("updatedAt",System.currentTimeMillis());if(error!=null)a.put("error",error.take(160));all.put(id,a);save(c,all)}
+    @Synchronized fun mark(c: Context,id: String,state: String,error: String?=null){val all=records(c);val a=all.optJSONObject(id)?:return;if(state in OwnedAlarmPolicy.terminal)manager(c).cancel(fire(c,id));a.put("state",state).put("updatedAt",System.currentTimeMillis());if(error!=null)a.put("error",error.take(160));all.put(id,a);save(c,all)}
     @Synchronized fun restore(c: Context){val all=records(c);for(id in all.keys().asSequence().toList())reconcile(c,all.getJSONObject(id))}
 }
 
