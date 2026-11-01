@@ -1443,7 +1443,7 @@
   },
   {
     "name": "activate_device_mode",
-    "description": "Activate a mode as a separate instance. Choose durationMinutes or until, or its saved timing. allowedPackages switches this activation to allow_list. Optional device actions require separate local consent/Android permissions. Alarm requests require local Clock confirmation. Accepted is not enforced; check status.",
+    "description": "Activate a mode as a separate instance. Choose durationMinutes or until, or its saved timing. allowedPackages switches this activation to allow_list. Optional device actions require separate local consent/Android permissions. Automatic alarms require explicit local consent and exact-alarm/notification access; only delivery system_clock needs foreground Clock confirmation. Accepted is not enforced; check status.",
     "inputSchema": {
       "type": "object",
       "properties": {
