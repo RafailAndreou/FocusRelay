@@ -41,7 +41,7 @@ object OwnedAlarms {
     @Synchronized fun reconcile(c: Context,d: JSONObject): JSONObject {
         val all=records(c);val id=d.getString("id");val a=all.optJSONObject(id)?:JSONObject(d.toString()).put("state","requested")
         val now=System.currentTimeMillis();val issue=readiness(c)
-        val observedState=if(a.optString("state")=="ringing"&&!WakeAlarmService.isRinging(id))"missed"else a.optString("state")
+        val observedState=if(a.optString("state")=="ringing"&&!WakeAlarmService.isRinging(id)) "missed" else a.optString("state")
         val next=OwnedAlarmPolicy.decision(observedState,d.has("cancelRequestedAt"),enabled(c),issue==null,a.getLong("triggerAtMs"),now)
         if(next!="scheduled"&&next!="ringing")manager(c).cancel(fire(c,id))
         if(next=="cancelled")WakeAlarmService.stopIfRinging(c,id)

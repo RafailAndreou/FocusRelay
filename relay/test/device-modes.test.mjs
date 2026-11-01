@@ -171,3 +171,9 @@ test('automatic alarm API requires explicit phone consent, readiness and capabil
  await sync(e,cancelled.revision,report({deviceModes:{...dm,alarms:[{id:accepted.item.id,state:'cancelled',updatedAt:Date.now()+1000}]}}));
  v=await(await api(e,'/api/status')).json();assert.equal(v.alarms[0].state,'cancelled');assert.equal(v.alarms[0].systemConfirmed,false);
 });
+
+test('existing owned alarms can be cancelled after Device Modes are disabled locally',async()=>{
+ const e=env();const dm={...report().deviceModes,alarmSupportVersion:2,automaticAlarmConsent:true,automaticAlarmReady:true};
+ await sync(e,-1,report({deviceModes:dm}));const a=await(await op(e,'set_alarm',{triggerAt:new Date(Math.ceil((Date.now()+300000)/60000)*60000).toISOString(),requestId:'cancel-disabled'})).json();
+ await sync(e,a.revision,report({deviceModes:{...dm,enabled:false}}));assert.equal((await op(e,'cancel_alarm',{id:a.item.id})).status,202);
+});

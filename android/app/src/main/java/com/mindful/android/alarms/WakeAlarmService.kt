@@ -15,7 +15,7 @@ class WakeAlarmService: Service(){
     companion object {
         @Volatile private var active: WakeAlarmService?=null
         fun isRinging(id: String)=active?.let{it.alarmId==id && runCatching{it.player?.isPlaying==true}.getOrDefault(false)}?:false
-        fun stopIfRinging(c: Context,id: String){val s=active;if(s?.alarmId==id)s.handler.post{s.stopSelf()}}
+        fun stopIfRinging(c: Context,id: String){val s=active;if(s?.alarmId==id)s.handler.post{if(s.alarmId==id)s.stopSelf()}}
     }
     val handler=Handler(Looper.getMainLooper())
     private var player: MediaPlayer?=null

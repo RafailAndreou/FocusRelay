@@ -120,9 +120,10 @@ function modeSnapshot(row,phone) {return phone.schemaVersion===3?{...readPlannin
 async function changeModes(env,name,args,fromDevice=false) {
   for(let attempt=0;attempt<5;attempt++) {
     const row=await deviceRow(env),phone=JSON.parse(row.status),state=readModes(row);
-    if(phone.schemaVersion!==3||!phone.deviceModes?.enabled)fail(409,'Enable Device Modes locally on an updated phone first');
+    if(phone.schemaVersion!==3||(!phone.deviceModes?.enabled&&name!=='cancel_alarm'))fail(409,'Enable Device Modes locally on an updated phone first');
     const eligible=modeEligibility(phone,JSON.parse(row.apps));
     const templateAlarm=state.templates.find(t=>t.id===args.id)?.alarm;
+    if(name==='create_mode_sequence'){for(const step of args.steps||[]){const t=state.templates.find(t=>t.id===step.modeId);if(t?.alarm?.enabled||t?.alarmAtMs!==undefined){const delivery=t.alarm?.delivery??'focusrelay';if(delivery==='focusrelay'&&(phone.deviceModes?.alarmSupportVersion!==2||!phone.deviceModes?.automaticAlarmConsent||!phone.deviceModes?.automaticAlarmReady))fail(409,'Enable automatic alarms locally before scheduling a sequence');if(delivery==='system_clock'&&!phone.deviceModes?.alarmConsent)fail(409,'Enable Clock handoff locally first');}}}
     const touchesAlarm=alarmOperations.has(name)||args.alarm?.enabled||args.alarmTime||name==='activate_device_mode'&&templateAlarm?.enabled;
     if(touchesAlarm){
       const delivery=name==='cancel_alarm'?(state.alarms||[]).find(a=>a.id===args.id)?.delivery??'system_clock':args.delivery??args.alarm?.delivery??templateAlarm?.delivery??'focusrelay';
