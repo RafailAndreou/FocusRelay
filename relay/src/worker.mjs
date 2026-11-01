@@ -122,7 +122,14 @@ async function changeModes(env,name,args,fromDevice=false) {
     const row=await deviceRow(env),phone=JSON.parse(row.status),state=readModes(row);
     if(phone.schemaVersion!==3||!phone.deviceModes?.enabled)fail(409,'Enable Device Modes locally on an updated phone first');
     const eligible=modeEligibility(phone,JSON.parse(row.apps));
-    if(alarmOperations.has(name)||args.alarm?.enabled||args.alarmTime||((name==='activate_device_mode')&&(state.templates.find(t=>t.id===args.id)?.alarm?.enabled||state.templates.find(t=>t.id===args.id)?.alarmAtMs!==undefined))){if(phone.deviceModes?.alarmSupportVersion!==1||(name!=='cancel_alarm'&&!phone.deviceModes?.alarmConsent))fail(409,'Enable system alarm requests locally on an updated phone first');}
+    const templateAlarm=state.templates.find(t=>t.id===args.id)?.alarm;
+    const touchesAlarm=alarmOperations.has(name)||args.alarm?.enabled||args.alarmTime||name==='activate_device_mode'&&templateAlarm?.enabled;
+    if(touchesAlarm){
+      const delivery=name==='cancel_alarm'?(state.alarms||[]).find(a=>a.id===args.id)?.delivery??'system_clock':args.delivery??args.alarm?.delivery??templateAlarm?.delivery??'focusrelay';
+      if(delivery==='focusrelay'){
+        if(phone.deviceModes?.alarmSupportVersion!==2||(name!=='cancel_alarm'&&(!phone.deviceModes?.automaticAlarmConsent||!phone.deviceModes?.automaticAlarmReady)))fail(409,'Enable automatic alarms and grant Alarms & reminders/notifications on an updated phone first');
+      }else if(![1,2].includes(phone.deviceModes?.alarmSupportVersion)||(name!=='cancel_alarm'&&!phone.deviceModes?.alarmConsent))fail(409,'Enable Clock handoff locally first');
+    }
     const value=alarmOperations.has(name)?mutateAlarm(state,name,args):mutateModes(state,name,args,eligible);
     snapshotFits(JSON.parse(row.blocks),{...readPlanning(row),deviceModes:state});
     const r=await env.DB.prepare('UPDATE device SET assistant_state=?,revision=revision+1 WHERE id=1 AND revision=?').bind(JSON.stringify(state),row.revision).run();

@@ -38,6 +38,19 @@ test('cancellation waits for a fresh matching phone observation',()=>{
  assert.throws(()=>mutateAlarm(s,'cancel_alarm',{id:'unknown'},now));
 });
 test('malformed observations rejected and tools preserve OAuth',()=>{
- assert.throws(()=>validateAlarmReports([{id:'a',state:'ringing',updatedAt:now}]));
+ assert.throws(()=>validateAlarmReports([{id:'a',state:'fabricated',updatedAt:now}]));
  for(const name of ['set_alarm','list_remote_alarms','cancel_alarm']){const t=tools.find(t=>t.name===name);assert.equal(t.securitySchemes[0].type,'oauth2');}
+});
+
+test('owned alarms require a fresh phone scheduling receipt before confirmation',()=>{
+ const s=emptyModes(),a=addAlarm(s,request,now);assert.equal(a.delivery,'focusrelay');
+ const phone={deviceModes:{alarms:[{id:a.id,state:'scheduled',updatedAt:now}]}};
+ assert.equal(alarmStatus(s,phone,false,true,now).alarms[0].systemConfirmed,false);
+ assert.equal(alarmStatus(s,phone,true,true,now).alarms[0].systemConfirmed,true);
+ assert.equal(alarmStatus(s,phone,true,false,now).alarms[0].systemConfirmed,false);
+});
+test('Clock fallback is explicit and does not confirm a system alarm',()=>{
+ const s=emptyModes(),a=addAlarm(s,{...request,delivery:'system_clock'},now);
+ const phone={deviceModes:{alarms:[{id:a.id,state:'launched',updatedAt:now}]}};
+ assert.equal(alarmStatus(s,phone,true,true,now).alarms[0].systemConfirmed,false);
 });

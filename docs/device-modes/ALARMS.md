@@ -1,3 +1,5 @@
+> This describes the optional delegated Clock path from 1.7.2. For current automatic remote alarms, see [AUTOMATIC_ALARMS.md](AUTOMATIC_ALARMS.md).
+
 # System alarm requests (V1)
 
 FocusRelay delegates ringing, snooze, sound, vibration and alarm screens to Android's Clock app. It never plays an alarm itself. Only FocusRelay-requested metadata is listed; it cannot inspect arbitrary system alarms.

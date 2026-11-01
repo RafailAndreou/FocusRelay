@@ -1065,6 +1065,13 @@
               "type": "string",
               "format": "date-time"
             },
+            "delivery": {
+              "type": "string",
+              "enum": [
+                "focusrelay",
+                "system_clock"
+              ]
+            },
             "time": {
               "type": "string",
               "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
@@ -1275,6 +1282,13 @@
               "type": "string",
               "format": "date-time"
             },
+            "delivery": {
+              "type": "string",
+              "enum": [
+                "focusrelay",
+                "system_clock"
+              ]
+            },
             "time": {
               "type": "string",
               "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
@@ -1474,6 +1488,13 @@
             "triggerAt": {
               "type": "string",
               "format": "date-time"
+            },
+            "delivery": {
+              "type": "string",
+              "enum": [
+                "focusrelay",
+                "system_clock"
+              ]
             },
             "time": {
               "type": "string",
@@ -2043,7 +2064,7 @@
   },
   {
     "name": "set_alarm",
-    "description": "Request a system Clock alarm. Supply an absolute triggerAt with explicit offset, to minute precision, within 24 hours. Phone must confirm it is the next occurrence of that wall time. Open FocusRelay to launch Clock; no background launch or guaranteed system creation. Retry with the same requestId. Recurrence is unsupported in V1.",
+    "description": "Create a remotely scheduled wake-up alarm. Supply an absolute triggerAt with explicit offset, to minute precision, within 24 hours. Clock handoff delivery must be the next occurrence of that wall time; FocusRelay delivery uses the absolute instant. Default delivery focusrelay schedules a phone-owned audible alarm automatically after sync, with explicit local consent and exact-alarm/notification access. delivery system_clock requires foreground Clock handoff and cannot confirm system creation. Retry with the same requestId. Recurrence is unsupported in V1.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -2054,6 +2075,13 @@
         "label": {
           "type": "string",
           "maxLength": 80
+        },
+        "delivery": {
+          "type": "string",
+          "enum": [
+            "focusrelay",
+            "system_clock"
+          ]
         },
         "skipUi": {
           "type": "boolean"
@@ -2128,7 +2156,7 @@
   },
   {
     "name": "cancel_alarm",
-    "description": "Cancel an unlaunched request by its FocusRelay id. Already handed-off or uncertain requests require managing the alarm in Clock; never claims silent system cancellation. Phone acknowledgement is required.",
+    "description": "Cancel a FocusRelay-owned alarm (including ringing) after phone sync, or an unlaunched Clock request. Clock handoffs need user cancellation. Wait for phone acknowledgement; no internet means cancellation is pending.",
     "inputSchema": {
       "type": "object",
       "properties": {

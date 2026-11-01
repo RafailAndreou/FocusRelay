@@ -33,7 +33,7 @@ class DeviceModeMethodHandler(private val activity: Activity) {
             when(call.method){
                 "modeState"->{
                     val e=RemoteStore.evaluation(activity);val o=JSONObject().put("timeZone",ZoneId.systemDefault().id).put("connected",RemoteStore.enabled(activity)).put("enabled",DeviceModeStore.enabled(activity)).put("actionsConsent",DeviceModeStore.actionsConsent(activity)).put("usageSharing",DeviceModeStore.usageSharing(activity))
-                        .put("alarmConsent",com.mindful.android.alarms.RemoteAlarms.consent(activity)).put("alarms",com.mindful.android.alarms.RemoteAlarms.reconcile(activity))
+                        .put("automaticAlarmConsent",com.mindful.android.alarms.OwnedAlarms.enabled(activity)).put("automaticAlarmError",com.mindful.android.alarms.OwnedAlarms.readiness(activity)?:JSONObject.NULL).put("alarmConsent",com.mindful.android.alarms.RemoteAlarms.consent(activity)).put("alarms",com.mindful.android.alarms.RemoteAlarms.reconcile(activity))
                         .put("exclusions",JSONArray(DeviceModeStore.excluded(activity).toList())).put("eligiblePackages",JSONArray(DeviceModeStore.eligible(activity).toList())).put("apps",JSONArray(RemoteStore.sharedApps(activity))).put("deviceModes",RemoteStore.modeJson(activity)).put("nextTransitionMs",e.nextTransitionMs?:JSONObject.NULL)
                         .put("permissions",JSONObject(DeviceModeActions.permissions(activity))).put("errors",JSONArray(DeviceModeActions.errors(activity)))
                         .put("instances",JSONArray((e.modes?.states?:emptyList()).map{s->JSONObject().put("id",s.instance.id).put("name",s.instance.name).put("mode",s.instance.mode).put("phase",s.phase).put("endAtMs",s.window?.endAtMs?:s.instance.expiresAtMs).put("allowedPackages",JSONArray(s.instance.allowedPackages.toList())).put("blockedPackages",JSONArray(s.blocked.toList())).put("alarmAtMs",s.instance.alarmAtMs?:JSONObject.NULL)}))
@@ -47,6 +47,13 @@ class DeviceModeMethodHandler(private val activity: Activity) {
                     val name=call.argument<String>("name");require(name in setOf("dnd","brightness"))
                     main.post{try{activity.startActivity(if(name=="dnd")Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)else Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,Uri.parse("package:${activity.packageName}")));result.success(true)}catch(e:Exception){result.error("MODE_PERMISSION",e.message,null)}};return
                 }
+                "automaticAlarmConsent"->{com.mindful.android.alarms.OwnedAlarms.setup(activity,call.argument<Boolean>("enabled")==true);refresh()}
+                "alarmPermissions"->{main.post{try{
+                    if(android.os.Build.VERSION.SDK_INT>=31&&!com.mindful.android.remote.RemoteScheduler.exactAllowed(activity))activity.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:${activity.packageName}")))
+                    else activity.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,activity.packageName))
+                    result.success(true)
+                }catch(e:Exception){result.error("ALARM_PERMISSION",e.message,null)}};return}
+                "dismissOwnedAlarm"->{val id=call.argument<String>("id")?:"";com.mindful.android.alarms.OwnedAlarms.mark(activity,id,"dismissed");com.mindful.android.alarms.WakeAlarmService.stopIfRinging(activity,id);refresh()}
                 "alarmConsent"->{com.mindful.android.alarms.RemoteAlarms.consent(activity,call.argument<Boolean>("enabled")==true);refresh()}
                 "launchRemoteAlarm","manageRemoteAlarm"->{
                     val id=call.argument<String>("id")?:""

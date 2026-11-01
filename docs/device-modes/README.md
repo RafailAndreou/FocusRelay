@@ -106,3 +106,5 @@ See [architecture/schema rationale](DESIGN.md) and [Samsung test checklist](SAMS
 Official references: [NotificationManager / own DND rules](https://developer.android.com/reference/android/app/NotificationManager), [Settings.System](https://developer.android.com/reference/android/provider/Settings.System), [AudioManager](https://developer.android.com/reference/android/media/AudioManager), [AlarmClock](https://developer.android.com/reference/android/provider/AlarmClock), [UsageStatsManager](https://developer.android.com/reference/android/app/usage/UsageStatsManager), [AlarmManager](https://developer.android.com/reference/android/app/AlarmManager).
 
 System Clock alarm requests: [ALARMS.md](ALARMS.md).
+
+Automatic remote wake-up alarms: [AUTOMATIC_ALARMS.md](AUTOMATIC_ALARMS.md).

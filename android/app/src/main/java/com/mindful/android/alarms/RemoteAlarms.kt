@@ -24,7 +24,7 @@ object RemoteAlarms {
         val old=read(c);val byId=(0 until old.length()).map{old.getJSONObject(it)}.associateBy{it.getString("id")}
         val result=JSONArray();val now=System.currentTimeMillis()
         for(n in 0 until desired.length()){
-            val d=desired.getJSONObject(n);val a=byId[d.getString("id")]?:JSONObject(d.toString()).put("state","user_action_required").put("updatedAt",now)
+            val d=desired.getJSONObject(n);if(d.optString("delivery","system_clock")=="focusrelay"){result.put(OwnedAlarms.reconcile(c,d));continue};val a=byId[d.getString("id")]?:JSONObject(d.toString()).put("state","user_action_required").put("updatedAt",now)
             if(d.has("cancelRequestedAt")&&!a.has("cancelHandledAt")){
                 a.put("state",AlarmPolicy.cancel(a.optBoolean("launchAttempted"))).put("cancelHandledAt",d.getLong("cancelRequestedAt")).put("updatedAt",maxOf(now,d.getLong("cancelRequestedAt")))
                 if(a.optBoolean("launchAttempted"))a.put("error","Cancel this alarm in Clock; system cancellation cannot be confirmed")
@@ -35,7 +35,7 @@ object RemoteAlarms {
         }
         // Keep locally tracked handed-off alarms even if an older relay omits the extension.
         for(n in 0 until old.length()){val a=old.getJSONObject(n);if(!byId.containsKey(a.getString("id")))continue
-            if((0 until result.length()).none{result.getJSONObject(it).getString("id")==a.getString("id")}&&result.length()<32)result.put(a)
+            if((0 until result.length()).none{result.getJSONObject(it).getString("id")==a.getString("id")}&&result.length()<32)result.put(if(a.optString("delivery")=="focusrelay")OwnedAlarms.reconcile(c,a)else a)
         }
         save(c,result);return result
     }

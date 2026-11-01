@@ -83,7 +83,7 @@ function activate(s,t,opts,apps,now){
   if(at.type!=='once')bad('V1 alarms require a one-time mode');
   if(a.alarm?.time)bad('V1 mode alarms require triggerAt or default to the mode end; local time alone is ambiguous');
   const trigger=a.alarm?.triggerAt??new Date(alarmAtMs??Math.ceil(expiresAtMs/60000)*60000).toISOString();
-  addAlarm(s,{triggerAt:trigger,label:a.alarm?.label??('Wake up: '+a.name).slice(0,80),skipUi:a.alarm?.skipUi,requestId:item.id},now,{associatedModeId:t.id,associatedActivationId:item.id});
+  addAlarm(s,{triggerAt:trigger,label:a.alarm?.label??('Wake up: '+a.name).slice(0,80),skipUi:a.alarm?.skipUi,delivery:a.alarm?.delivery??'focusrelay',requestId:item.id},now,{associatedModeId:t.id,associatedActivationId:item.id});
  }
  s.instances.push(item);return item;
 }

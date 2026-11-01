@@ -432,6 +432,13 @@ class _DeviceModesPanelState extends State<DeviceModesPanel>
             ),
           ),
         SwitchListTile(
+          title: const Text('Allow automatic FocusRelay alarms'),
+          subtitle: Text(state['automaticAlarmError'] as String? ?? 'Alarms ring automatically after sync. Uses your alarm volume. No Clock confirmation needed. Turning this off cancels FocusRelay-owned alarms.'),
+          value: state['automaticAlarmConsent'] == true,
+          onChanged: busy ? null : (v) => invoke('automaticAlarmConsent', {'enabled': v}),
+        ),
+        TextButton(onPressed: () => invoke('alarmPermissions'), child: const Text('Alarm and notification permissions')),
+        SwitchListTile(
           title: const Text('Allow system alarm requests'),
           subtitle: const Text('Requests wait here until you open Clock. Enable device actions too. Clock owns ringing and cancellation.'),
           value: state['alarmConsent'] == true,
@@ -441,10 +448,12 @@ class _DeviceModesPanelState extends State<DeviceModesPanel>
         for (final alarm in rows(state['alarms']))
           ListTile(
             title: Text('${alarm['label']} · ${time(alarm['triggerAtMs'])}'),
-            subtitle: Text('${alarm['state']} — system state unverified${alarm['error'] == null ? '' : '\n${alarm['error']}'}'),
+            subtitle: Text('${alarm['state']} · ${alarm['delivery'] == 'focusrelay' ? 'FocusRelay alarm' : 'Clock state unverified'}${alarm['error'] == null ? '' : '\n${alarm['error']}'}'),
             trailing: Wrap(children: [
-              if (alarm['launchAttempted'] != true && (alarm['state'] == 'user_action_required' || alarm['state'] == 'failed') && alarm['cancelHandledAt'] == null)
+              if (alarm['delivery'] != 'focusrelay' && alarm['launchAttempted'] != true && (alarm['state'] == 'user_action_required' || alarm['state'] == 'failed') && alarm['cancelHandledAt'] == null)
                 TextButton(onPressed: busy ? null : () => invoke('launchRemoteAlarm', {'id': alarm['id']}), child: const Text('Open Clock')),
+              if (alarm['delivery'] == 'focusrelay' && !['cancelled', 'dismissed', 'missed'].contains(alarm['state']))
+                TextButton(onPressed: busy ? null : () => invoke('dismissOwnedAlarm', {'id': alarm['id']}), child: const Text('Dismiss locally')),
               if (alarm['launchAttempted'] == true)
                 TextButton(onPressed: busy ? null : () => invoke('manageRemoteAlarm', {'id': alarm['id']}), child: const Text('Manage in Clock')),
               if (alarm['cancelHandledAt'] == null && alarm['state'] != 'expired')
@@ -766,7 +775,7 @@ class _DeviceModeEditorState extends State<DeviceModeEditor> {
             ),
           SwitchListTile(
             title: const Text('Set wake-up alarm'),
-            subtitle: const Text('One-time modes only. Defaults to the mode end, rounded up to a minute. Open Modes to hand it to Clock.'),
+            subtitle: const Text('One-time modes only. Rings automatically when locally enabled. Defaults to the mode end, rounded up to a minute.'),
             value: wakeAlarm,
             onChanged: (v) => setState(() { wakeAlarm = v; }),
           ),

@@ -16,6 +16,7 @@ object AlarmPolicy {
         require(a.getLong("triggerAtMs")%60000L==0L)
         val label=a.get("label");require(label is String && label.isNotBlank() && label.length<=80 && label.none{it<' '})
         require(a.get("skipUi") is Boolean)
+        require(a.optString("delivery","system_clock") in setOf("system_clock","focusrelay"))
         require(a.getJSONArray("daysOfWeek").length()==0){"Recurring alarms are unsupported in V1"}
         if(a.has("cancelRequestedAt")){val n=a.get("cancelRequestedAt");require(n is Number && n.toLong()>0 && n.toDouble()==n.toLong().toDouble())}
     }

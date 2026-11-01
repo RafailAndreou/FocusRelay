@@ -158,3 +158,16 @@ test('history retention hides aged events even before the daily cleanup runs',as
  assert.equal((await queryEvents(e,range)).items.length,0);
  await worker.scheduled({},e);assert.equal(e.DB.db.prepare('SELECT count(*) AS n FROM remote_events').get().n,0);
 });
+
+test('automatic alarm API requires explicit phone consent, readiness and capability version 2',async()=>{
+ const e=env();await sync(e);const args={triggerAt:new Date(Math.ceil((Date.now()+300000)/60000)*60000).toISOString(),requestId:'automatic-test',label:'Wake up'};
+ assert.equal((await op(e,'set_alarm',args)).status,409);
+ const dm={...report().deviceModes,alarmSupportVersion:2,automaticAlarmConsent:true,automaticAlarmReady:true};
+ await sync(e,-1,report({deviceModes:dm}));const accepted=await (await op(e,'set_alarm',args)).json();assert.equal(accepted.acknowledged,false);assert.equal(accepted.item.delivery,'focusrelay');
+ let v=await(await api(e,'/api/status')).json();assert.equal(v.alarms[0].systemConfirmed,false);
+ await sync(e,accepted.revision,report({deviceModes:{...dm,alarms:[{id:accepted.item.id,state:'scheduled',updatedAt:Date.now()}]}}));
+ v=await(await api(e,'/api/status')).json();assert.equal(v.alarms[0].systemConfirmed,true);
+ const cancelled=await(await op(e,'cancel_alarm',{id:accepted.item.id})).json();assert.equal(cancelled.acknowledged,false);
+ await sync(e,cancelled.revision,report({deviceModes:{...dm,alarms:[{id:accepted.item.id,state:'cancelled',updatedAt:Date.now()+1000}]}}));
+ v=await(await api(e,'/api/status')).json();assert.equal(v.alarms[0].state,'cancelled');assert.equal(v.alarms[0].systemConfirmed,false);
+});
