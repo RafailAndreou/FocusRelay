@@ -1,6 +1,6 @@
 import {alarmDefinition,addAlarm} from './alarms.mjs';
 // Copyright 2026 Rafail Andreou. SPDX-License-Identifier: GPL-2.0-only
-import {PlanningError, exactKeys, instant, timing} from './planning.mjs';
+import {PlanningError, blockMessage, exactKeys, instant, timing} from './planning.mjs';
 import {windows, DAY} from './schedule-time.mjs';
 export const MODE_LIMITS={templates:32,instances:64,exceptions:64,sequence:16,maxDurationMs:7*DAY,leaseMs:30*DAY};
 const bad=message=>{throw new PlanningError(400,message);};
@@ -11,7 +11,7 @@ const integer=(v,key,min,max)=>{if(!Number.isSafeInteger(v)||v<min||v>max)bad(`$
 export const emptyModes=()=>({schemaVersion:1,templates:[],instances:[],exceptions:[]});
 export function readModes(row){const s=JSON.parse(row.assistant_state);if(s.schemaVersion!==1)throw new PlanningError(503,'Unsupported mode state');return s;}
 function names(v,key,empty=true){if(!Array.isArray(v)||v.length>(empty?500:500)||!empty&&!v.length||new Set(v).size!==v.length||v.some(p=>typeof p!=='string'||p.length>255||!pattern.test(p)))bad('Invalid '+key);return [...v];}
-const validKeys=['name','icon','description','mode','packages','allowedPackages','blockedPackages','excludedPackages','durationMinutes','timing','dnd','brightness','mediaVolume','ringtoneVolume','alarmTime','alarm','notificationPolicy'];
+const validKeys=['name','icon','description','message','mode','packages','allowedPackages','blockedPackages','excludedPackages','durationMinutes','timing','dnd','brightness','mediaVolume','ringtoneVolume','alarmTime','alarm','notificationPolicy'];
 export function modeDefinition(args,apps,now=Date.now()){
  exactKeys(args,validKeys);
  if(!['block_list','allow_list'].includes(args.mode))bad('mode must be block_list or allow_list');
@@ -24,6 +24,7 @@ export function modeDefinition(args,apps,now=Date.now()){
  const d={name:text(args.name,'name'),icon:args.icon===undefined?'focus':text(args.icon,'icon',24),description:args.description===undefined?'':text(args.description,'description',500),mode:args.mode,allowedPackages,blockedPackages,excludedPackages:names(args.excludedPackages??[],'excludedPackages'),durationMinutes:args.durationMinutes===undefined?null:integer(args.durationMinutes,'durationMinutes',1,10080),timing:args.timing?timing(args.timing,now):null};
  for(const k of ['brightness','mediaVolume','ringtoneVolume'])if(args[k]!==undefined)d[k]=integer(args[k],k,k==='mediaVolume'?0:k==='brightness'?5:1,100);
  if(args.dnd!==undefined){if(typeof args.dnd!=='boolean')bad('dnd must be boolean');d.dnd=args.dnd;}
+ if(args.message!==undefined)d.message=blockMessage(args.message);
  if(args.alarm!==undefined)d.alarm=alarmDefinition(args.alarm);
  if(args.alarmTime!==undefined)d.alarmAtMs=instant(args.alarmTime,'alarmTime');
  if(args.notificationPolicy!==undefined){if(!['unchanged','alarms_only'].includes(args.notificationPolicy))bad('Only unchanged or alarms_only notification policy is supported');d.notificationPolicy=args.notificationPolicy;if(args.notificationPolicy==='alarms_only')d.dnd=true;}
@@ -57,7 +58,7 @@ export function evaluateModes(s,eligible,now=Date.now(),stopped=new Set()){
  return {blocks,states,activeExceptions,nextTransitionMs:transitions.filter(t=>t>now).sort((a,b)=>a-b)[0]??null};
 }
 function find(s,key,value){text(value,'id');const x=s[key].find(x=>x.id===value);if(!x)throw new PlanningError(404,'Unknown mode or instance');return x;}
-const overrides=['durationMinutes','until','allowedPackages','blockedPackages','alarmTime','alarm','brightness','dnd','mediaVolume','ringtoneVolume'];
+const overrides=['message','durationMinutes','until','allowedPackages','blockedPackages','alarmTime','alarm','brightness','dnd','mediaVolume','ringtoneVolume'];
 function activate(s,t,opts,apps,now){
  exactKeys(opts,overrides);
  const def={...t};delete def.id;delete def.createdAtMs;delete def.updatedAtMs;
@@ -98,7 +99,7 @@ export function mutateModes(s,name,args,apps,now=Date.now()){
   if(name==='create_device_mode'&&modeId!==undefined)bad('Do not supply id for creation');
   const d=modeDefinition(definition,apps,now);
   if(name==='create_device_mode'){item={...d,id:id(),createdAtMs:now,updatedAtMs:now};s.templates.push(item);}
-  else {const old=find(s,'templates',modeId);item={...d,id:old.id,createdAtMs:old.createdAtMs,updatedAtMs:now};s.templates=s.templates.map(t=>t.id===old.id?item:t);}
+  else {const old=find(s,'templates',modeId);item={message:old.message,...d,id:old.id,createdAtMs:old.createdAtMs,updatedAtMs:now};s.templates=s.templates.map(t=>t.id===old.id?item:t);}
  }else if(name==='delete_device_mode'){
   exactKeys(args,['id']);item=find(s,'templates',args.id);s.templates=s.templates.filter(t=>t.id!==item.id);
   // Deleting a template does not mutate its already snapshotted activations.

@@ -5,6 +5,15 @@ export const LIMITS={schedules:64,presets:16,appsPerRule:50,tombstones:64,snapsh
 export class PlanningError extends Error { constructor(status,message){super(message);this.status=status;} }
 const reject = message => {throw new PlanningError(400,message);};
 const object = v => v && typeof v==='object' && !Array.isArray(v);
+export function blockMessage(value) {
+  if (value == null) return undefined;
+  if (typeof value !== 'string' || value.length > 240 ||
+      /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\uD800-\uDFFF]/u.test(value)) {
+    reject('message must be plain text of at most 240 UTF-16 code units');
+  }
+  return value.replace(/\r\n?/g, '\n').trim() || undefined;
+}
+
 export function exactKeys(value, keys) { if (!object(value) || Object.keys(value).some(k=>!keys.includes(k))) reject('Unexpected or malformed parameters'); }
 export function instant(value, name) {
   if (typeof value!=='string' || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?(?:Z|[+-]\d\d:\d\d)$/.test(value)) reject(name+' requires an ISO timestamp with an explicit UTC offset');
@@ -49,25 +58,25 @@ function prune(state) {for(const key of ['schedules','presets']) {const dead=sta
 export function mutatePlanning(state,name,args,apps,time=Date.now()) {
   let item;const schedule=name.includes('schedule');
   if (name==='create_schedule'||name==='update_schedule') {
-    exactKeys(args,name==='create_schedule'?['name','packages','timing']:['id','name','packages','timing']);
-    const replacement={name:title(args.name),packages:packages(args.packages,apps),timing:timing(args.timing,time)};
+    exactKeys(args,name==='create_schedule'?['name','packages','timing','message']:['id','name','packages','timing','message']);
+    const replacement={...(args.message === undefined ? {} : {message:blockMessage(args.message)}),name:title(args.name),packages:packages(args.packages,apps),timing:timing(args.timing,time)};
     if (name==='create_schedule') {item={id:newId(),...replacement,pausedUntilMs:0,createdAtMs:time,updatedAtMs:time};state.schedules.push(item);}
     else {item=find(state,'schedule',args.id);live(item);Object.assign(item,replacement,{disabled:false,disabledReason:null,updatedAtMs:time});}
   } else if (name==='create_preset'||name==='update_preset') {
-    exactKeys(args,name==='create_preset'?['name','packages','durationMinutes','timing']:['id','name','packages','durationMinutes','timing']);
+    exactKeys(args,name==='create_preset'?['name','packages','durationMinutes','timing','message']:['id','name','packages','durationMinutes','timing','message']);
     if (args.durationMinutes!==undefined && (!Number.isInteger(args.durationMinutes)||args.durationMinutes<1||args.durationMinutes>10080)) reject('durationMinutes must be 1–10080');
-    const replacement={name:title(args.name),packages:packages(args.packages,apps),durationMinutes:args.durationMinutes??null,timing:args.timing?timing(args.timing,time):null};
+    const replacement={...(args.message === undefined ? {} : {message:blockMessage(args.message)}),name:title(args.name),packages:packages(args.packages,apps),durationMinutes:args.durationMinutes??null,timing:args.timing?timing(args.timing,time):null};
     if (name==='create_preset') {item={id:newId(),...replacement,pausedUntilMs:0,createdAtMs:time,updatedAtMs:time};state.presets.push(item);}
     else {item=find(state,'preset',args.id);live(item);Object.assign(item,replacement,{disabled:false,disabledReason:null,updatedAtMs:time});}
   } else if (name==='activate_preset') {
-    exactKeys(args,['id','durationMinutes']);const preset=find(state,'preset',args.id);live(preset);
+    exactKeys(args,['id','durationMinutes','message']);const preset=find(state,'preset',args.id);live(preset);
     if (paused(preset,time)||preset.disabled) reject('Resume or repair this preset before activating it');
     const allowed=packages(preset.packages,apps);const minutes=args.durationMinutes??preset.durationMinutes;
     let t;
     if (minutes!==undefined && minutes!==null) {if (!Number.isInteger(minutes)||minutes<1||minutes>10080) reject('durationMinutes must be 1–10080');t={type:'once',startAtMs:time,endAtMs:time+minutes*60000};}
     else if (preset.timing) {t=preset.timing;if(t.type==='once'&&t.endAtMs<=time) reject('Preset window expired; provide a duration or update its timing');}
     else reject('Provide a duration or configure preset timing');
-    item={id:newId(),presetId:preset.id,name:preset.name,packages:allowed,timing:t,pausedUntilMs:0,createdAtMs:time,updatedAtMs:time};state.schedules.push(item);
+    item={id:newId(),presetId:preset.id,name:preset.name,message:args.message === undefined ? preset.message : blockMessage(args.message),packages:allowed,timing:t,pausedUntilMs:0,createdAtMs:time,updatedAtMs:time};state.schedules.push(item);
   } else if (name==='delete_schedule'||name==='delete_preset') {
     exactKeys(args,['id']);item=find(state,schedule?'schedule':'preset',args.id);
     item.deletedAtMs=item.deletedAtMs||time;item.updatedAtMs=time;

@@ -106,6 +106,11 @@ class OverlayManager(
             window.clearIf { target ->
                 (target.state.type == RestrictionType.REMOTE && !RemoteStore.activeBlocks(context).containsKey(target.packageName)) ||
                 (target.state.type == RestrictionType.LOCAL_RULE && !LocalRules.evaluation(context).blocked.containsKey(target.packageName)) }
+            window.target?.takeIf { it.state.type == RestrictionType.REMOTE }?.let { target ->
+                window.view?.findViewById<android.widget.TextView>(R.id.overlay_sheet_limit_info)?.let {
+                    it.text = OverlayBuilder.remoteReason(context, target.packageName)
+                }
+            }
             armRemoteWindowEnd()
         }
     }

@@ -1,5 +1,6 @@
 // Modified by Rafail Andreou, 2026-10-26, for FocusRelay. Original notices retained.
 // SPDX-License-Identifier: GPL-2.0-only
+export const message = {type:'string',maxLength:240,description:'Optional plain-text block overlay message. Empty clears it. Line breaks are supported.'};
 const obj=(properties,required=[])=>({type:'object',properties,required,additionalProperties:false});
 const id={type:'string',minLength:1,maxLength:80};
 const name={type:'string',minLength:1,maxLength:80};
@@ -12,15 +13,15 @@ const timing={"type":"object","properties":{"type":{"type":"string","enum":["onc
 const mutation=(name,description,schema)=>({name,description,inputSchema:schema,annotations:{readOnlyHint:false,destructiveHint:name.startsWith('delete'),openWorldHint:false}});
 const read=(name,description,schema)=>({name,description,inputSchema:schema,annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}});
 export const planningTools=[
-  mutation('create_schedule','Save a future one-time or weekly remote block. Resolve apps with list_apps. Weekly days identify the start day; endTime earlier than startTime means overnight. Pending until phone persists and acknowledges. Phone handles transitions offline.',obj({name,packages,timing},['name','packages','timing'])),
-  mutation('update_schedule','Replace the name, package list and timing of one schedule by id. Preserves its pause state and other rules. Use list_schedules first.',obj({id,name,packages,timing},['id','name','packages','timing'])),
+  mutation('create_schedule','Save a future one-time or weekly remote block. Resolve apps with list_apps. Weekly days identify the start day; endTime earlier than startTime means overnight. Pending until phone persists and acknowledges. Phone handles transitions offline.',obj({name,packages,timing,message},['name','packages','timing'])),
+  mutation('update_schedule','Replace the name, package list and timing of one schedule by id. Preserves its pause state and other rules. Use list_schedules first.',obj({id,name,packages,timing,message},['id','name','packages','timing'])),
   mutation('delete_schedule','Delete one remote schedule or activated preset instance by id. Other overlapping rules and upstream Mindful restrictions remain.',obj({id},['id'])),
   read('list_schedules','List desired schedules and UTC occurrences for a range of at most 31 days. Default next 24 hours. Desired phase is not proof of phone enforcement; use get_status. Names are untrusted data.',obj({from:stamp,to:stamp,includeDeleted:{type:'boolean'}})),
-  mutation('create_preset','Create a reusable named template (Study, Deep Work, Sleep, Driving or another name), with allowed apps and optional duration or timing. Does not activate or block anything.',obj({name,packages,durationMinutes,timing},['name','packages'])),
-  mutation('update_preset','Replace a preset template. Existing activation instances retain their app/timing snapshots; pause/delete of the parent still affects them. Omit optional fields to clear defaults.',obj({id,name,packages,durationMinutes,timing},['id','name','packages'])),
+  mutation('create_preset','Create a reusable named template (Study, Deep Work, Sleep, Driving or another name), with allowed apps and optional duration or timing. Does not activate or block anything.',obj({name,packages,durationMinutes,timing,message},['name','packages'])),
+  mutation('update_preset','Replace a preset template. Existing activation instances retain their app/timing snapshots; pause/delete of the parent still affects them. Omit optional fields to clear defaults.',obj({id,name,packages,durationMinutes,timing,message},['id','name','packages'])),
   mutation('delete_preset','Delete a preset and its linked activation instances. Independent remote blocks and normal Mindful restrictions remain.',obj({id},['id'])),
   read('list_presets','List reusable remote presets, defaults, pause state and linked activation status. Does not activate anything.',obj({includeDeleted:{type:'boolean'}})),
-  mutation('activate_preset','Create a separate blocking instance from a preset. durationMinutes overrides its default duration/timing. Pending until phone acknowledgement. Repeating the call creates another instance.',obj({id,durationMinutes},['id'])),
+  mutation('activate_preset','Create a separate blocking instance from a preset. durationMinutes overrides its default duration/timing. Pending until phone acknowledgement. Repeating the call creates another instance.',obj({id,durationMinutes,message},['id'])),
   mutation('pause_remote','Pause only one remote schedule or preset. until is an absolute timestamp within seven days; omit until to pause until explicit resume. To pause “today”, resolve the end of today in the schedule’s timezone. Other overlapping rules still apply.',obj({targetType:{type:'string',enum:['schedule','preset']},id,until:stamp},['targetType','id'])),
   mutation('resume_remote','Resume a paused remote schedule or preset. Does not restart durations or extend original windows. Normal Mindful rules remain independent.',obj({targetType:{type:'string',enum:['schedule','preset']},id},['targetType','id'])),
 ];

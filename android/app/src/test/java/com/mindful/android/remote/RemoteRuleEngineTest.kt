@@ -87,5 +87,45 @@ class RemoteRuleEngineTest {
         assertFalse(eval(snapshot(r),ms("2026-11-03T03:00:00Z")).activeBlocks.isEmpty())
         assertEquals("expired",eval(snapshot(r),ms("2026-11-04T00:00:00Z")).states.single().phase)
     }
+    @Test fun messagesFollowLatestDeadlineAndStableTieBreaks() {
+        val first = once("a", end=5000).copy(message="Schedule A")
+        val second = once("b", end=5000).copy(message="Schedule B")
+        val rules = snapshot(second, first, blocks=mapOf(app to 4000L))
+            .copy(blockMessages=mapOf(app to "Immediate"))
+        assertEquals("Schedule A", eval(rules, 2000).blockMessages[app])
+        val tied = rules.copy(blocks=mapOf(app to 5000L))
+        assertEquals("Immediate", eval(tied, 2000).blockMessages[app])
+        assertNull(eval(tied.copy(blockMessages=emptyMap()), 2000).blockMessages[app])
+        assertEquals(5000L, eval(tied, 2000).activeBlocks[app])
+    }
+
+    @Test fun persistedMessageLoadsOfflineAndMalformedMetadataKeepsBlock() {
+        val message = "Πάρε μια ανάσα 🌿\n<Keep going>"
+        val block = org.json.JSONObject().put("packageName", app).put("untilMs", 5000)
+        val data = org.json.JSONObject().put("revision", 7).put("serverTimeMs", 1000)
+            .put("blocks", org.json.JSONArray().put(block))
+        assertNull(eval(RemoteSnapshotParser.parse(data, setOf(app)), 2000).blockMessages[app])
+        block.put("message", message)
+        val reloaded = RemoteSnapshotParser.parse(org.json.JSONObject(data.toString()), setOf(app))
+        assertEquals(message, eval(reloaded, 2000).blockMessages[app])
+        block.put("message", "a".repeat(241))
+        val malformed = eval(RemoteSnapshotParser.parse(data, setOf(app)), 2000)
+        assertNull(malformed.blockMessages[app])
+        assertEquals(5000L, malformed.activeBlocks[app])
+    }
+    @Test fun activeDeviceModeCanSupplyTheWinningMessage() {
+        val mode = com.mindful.android.modes.DeviceModeInstance(
+            "mode", "template", "Sleep", "block_list", emptySet(), setOf(app), emptySet(),
+            RemoteTiming.Once(1000, 6000), 6000, 1000, message="Time for sleep"
+        )
+        val schedule = once(end=5000).copy(message="Study time")
+        val persisted = snapshot(schedule).copy(
+            deviceModes=com.mindful.android.modes.DeviceModeState(instances=listOf(mode))
+        )
+        assertEquals("Time for sleep", eval(persisted, 2000).blockMessages[app])
+        assertEquals("Study time", RemoteRuleEngine.evaluate(
+            persisted, setOf(app), 2000, stopped=setOf(mode.id)
+        ).blockMessages[app])
+    }
 }
 

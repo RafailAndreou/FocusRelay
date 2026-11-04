@@ -164,3 +164,25 @@ test('temporary discovery diagnostics redact credentials, arguments and query st
  assert.equal(unknown.rpcMethod,'other');assert.ok(!JSON.stringify(unknown).includes(secret));
 });
 
+
+test('immediate overlay messages survive sync, extensions and legacy requests',async()=>{
+  const e=env();
+  await sync(e);
+  const until=new Date(Date.now()+3600000).toISOString();
+  const message='Πάρε μια ανάσα 🌿\n<Keep going>';
+  const send=value=>worker.fetch(request('/api/blocks',{method:'POST',token:e.OWNER_SECRET,
+    body:{packages:[app.packageName],until:new Date(Date.now()+60000).toISOString(),message:value}}),e);
+  await block(e,until);
+  assert.equal((await (await sync(e)).json()).blocks[0].message,undefined);
+  assert.equal((await send(message)).status,202);
+  await block(e,until);
+  const snapshot=await (await sync(e)).json();
+  assert.deepEqual(snapshot.blocks,[{packageName:app.packageName,untilMs:Date.parse(until),message}]);
+  await sync(e,snapshot.revision);
+  const status=await (await worker.fetch(request('/api/status',{token:e.OWNER_SECRET}),e)).json();
+  assert.equal(status.acknowledged,true);
+  assert.equal(status.blocks[0].message,message);
+  for(const invalid of [42,{},'a'.repeat(241),'a\u0000b','\ud800'])assert.equal((await send(invalid)).status,400);
+  assert.equal((await send(null)).status,202);
+  assert.equal((await (await sync(e)).json()).blocks[0].message,undefined);
+});

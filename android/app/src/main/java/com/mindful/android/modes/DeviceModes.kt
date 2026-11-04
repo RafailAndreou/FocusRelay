@@ -13,7 +13,7 @@ const val MODE_DAY = 86400000L
 data class DeviceModeInstance(val id: String, val templateId: String, val name: String, val mode: String,
     val allowedPackages: Set<String>, val blockedPackages: Set<String>, val excludedPackages: Set<String>,
     val timing: RemoteTiming, val expiresAtMs: Long, val createdAtMs: Long, val actions: Map<String, Int> = emptyMap(),
-    val alarmAtMs: Long? = null, val pausedUntilMs: Long = 0, val stoppedAtMs: Long? = null)
+    val alarmAtMs: Long? = null, val pausedUntilMs: Long = 0, val stoppedAtMs: Long? = null, val message: String? = null)
 data class TemporaryException(val id: String, val instanceId: String, val packageName: String,
     val createdAtMs: Long, val untilMs: Long, val revokedAtMs: Long? = null)
 data class DeviceModeState(val instances: List<DeviceModeInstance> = emptyList(), val exceptions: List<TemporaryException> = emptyList())
@@ -108,7 +108,7 @@ object DeviceModeParser {
             val pause=number(i,"pausedUntilMs");require(pause>=-1)
             val stopped=if(i.has("stoppedAtMs"))number(i,"stoppedAtMs")else null
             require(stopped==null||stopped>=created)
-            DeviceModeInstance(text(i,"id"),text(i,"templateId"),text(i,"name"),i.getString("mode"),list(i.getJSONArray("allowedPackages")),list(i.getJSONArray("blockedPackages"),allowed),list(i.getJSONArray("excludedPackages")),timing,expiry,created,actions,alarm,pause,stopped)
+            DeviceModeInstance(text(i,"id"),text(i,"templateId"),text(i,"name"),i.getString("mode"),list(i.getJSONArray("allowedPackages")),list(i.getJSONArray("blockedPackages"),allowed),list(i.getJSONArray("excludedPackages")),timing,expiry,created,actions,alarm,pause,stopped,RemoteSnapshotParser.blockMessage(i))
         }
         require(instances.map{it.id}.toSet().size==instances.size)
         val e=o.getJSONArray("exceptions");require(e.length()<=64)
