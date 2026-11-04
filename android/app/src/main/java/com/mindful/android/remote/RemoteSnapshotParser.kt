@@ -56,15 +56,24 @@ object RemoteSnapshotParser {
         check(persist(parsed)) { "Cannot persist full desired snapshot" }
         return parsed
     }
+    internal fun blockMessage(json: JSONObject): String? =
+        (json.opt("message") as? String)?.takeIf { message ->
+            message.length <= 240 && message.none { it.isISOControl() && it !in "\n\t" }
+        }?.trim()?.takeIf { it.isNotEmpty() }
+
     fun parse(json: JSONObject, allowed: Set<String>, requireV2: Boolean = false): RemoteSnapshot {
         val revision=integer(json,"revision");require(revision>=0)
         require(integer(json,"serverTimeMs")>=0)
-        val blocks=items(json.getJSONArray("blocks"),500).associate { b ->
+        val blockObjects=items(json.getJSONArray("blocks"),500)
+        val blocks=blockObjects.associate { b ->
             val pkg=text(b,"packageName",255);require(packagePattern.matches(pkg)&&pkg in allowed) { "Block is not locally allowed" }
             val end=integer(b,"untilMs");require(end>=0);pkg to end
         }
         require(blocks.size==json.getJSONArray("blocks").length()) { "Duplicate immediate block" }
-        if(!json.has("schemaVersion")){require(!requireV2) { "Refusing legacy snapshot after receiving schedules" };return RemoteSnapshot(revision,blocks,emptyList(),emptyList())}
+        val messages=blockObjects.mapNotNull { block ->
+            blockMessage(block)?.let { block.getString("packageName") to it }
+        }.toMap()
+        if(!json.has("schemaVersion")){require(!requireV2) { "Refusing legacy snapshot after receiving schedules" };return RemoteSnapshot(revision,blocks,emptyList(),emptyList(),blockMessages=messages)}
         require(integer(json,"schemaVersion") in 2L..3L) { "Unsupported desired schema" }
         val presetObjects=items(json.getJSONArray("presets"),80)
         val presets=presetObjects.map { p ->
@@ -80,11 +89,11 @@ object RemoteSnapshotParser {
             val disabled=flag(r,"disabled")
             val parent=if(r.has("presetId"))text(r,"presetId")else null
             require(parent==null||presets.any{it.id==parent}) { "Unknown preset reference" }
-            RemoteRule(text(r,"id"),text(r,"name"),packages(r.getJSONArray("packages"),allowed,deleted||disabled),timing(r.getJSONObject("timing")),parent,pause(r),deleted,disabled)
+            RemoteRule(text(r,"id"),text(r,"name"),packages(r.getJSONArray("packages"),allowed,deleted||disabled),timing(r.getJSONObject("timing")),parent,pause(r),deleted,disabled,blockMessage(r))
         }
         require(rules.map{it.id}.toSet().size==rules.size && rules.count{!it.deleted}<=64)
         val modes=if(integer(json,"schemaVersion")==3L)com.mindful.android.modes.DeviceModeParser.parse(json.getJSONObject("deviceModes"),allowed)else com.mindful.android.modes.DeviceModeState()
-        return RemoteSnapshot(revision,blocks,rules,presets,modes)
+        return RemoteSnapshot(revision,blocks,rules,presets,modes,messages)
     }
 }
 

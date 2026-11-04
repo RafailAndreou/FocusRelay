@@ -138,3 +138,17 @@ test('MCP discovery exposes typed object schemas without union conversion requir
  assert.throws(()=>timing({type:'weekly',timeZone:'Asia/Nicosia'},t));
 });
 
+
+test('schedule messages sync and preset activations snapshot their message',async()=>{
+ const e=env();await sync(e);
+ const schedule=await (await op(e,'create_schedule',{name:'Study',packages:[app.packageName],
+   timing:{type:'once',startAt:new Date(Date.now()+60000).toISOString(),endAt:new Date(Date.now()+3600000).toISOString()},message:'Read two pages\nThen take a break'})).json();
+ assert.equal(schedule.item.message,'Read two pages\nThen take a break');
+ assert.equal((await (await sync(e)).json()).schedules[0].message,schedule.item.message);
+ const s=blank(), args={name:'Deep work',packages:[app.packageName],durationMinutes:20};
+ const preset=mutatePlanning(s,'create_preset',{...args,message:'First draft'},[app],t).item;
+ const activation=mutatePlanning(s,'activate_preset',{id:preset.id},[app],t).item;
+ mutatePlanning(s,'update_preset',{...args,id:preset.id,message:'Second draft'},[app],t);
+ assert.equal(activation.message,'First draft');
+ assert.equal(mutatePlanning(s,'activate_preset',{id:preset.id,message:''},[app],t).item.message,undefined);
+});

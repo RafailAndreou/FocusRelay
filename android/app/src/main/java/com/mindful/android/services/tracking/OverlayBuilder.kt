@@ -141,7 +141,8 @@ object OverlayBuilder {
 
         // Limit information
         val limitInfo = sheetView.findViewById<TextView>(R.id.overlay_sheet_limit_info)
-        limitInfo.text = getRestrictionInfo(context, state)
+        limitInfo.text = if (state.type == RestrictionType.REMOTE) remoteReason(context, packageName)
+            else getRestrictionInfo(context, state)
 
         // Limit progress, and use more layout
         if (state.screenTimeLimit > 0 && state.screenTimeUsed > 0) {
@@ -230,6 +231,10 @@ object OverlayBuilder {
 
         return appName to appIcon
     }
+
+    internal fun remoteReason(context: Context, packageName: String): String =
+        RemoteStore.evaluation(context).blockMessages[packageName]
+            ?: context.getString(R.string.remote_block_reason)
 
     private fun getRestrictionInfo(
         context: Context,

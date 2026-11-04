@@ -108,3 +108,30 @@ Official references: [NotificationManager / own DND rules](https://developer.and
 System Clock alarm requests: [ALARMS.md](ALARMS.md).
 
 Automatic remote wake-up alarms: [AUTOMATIC_ALARMS.md](AUTOMATIC_ALARMS.md).
+
+### Custom remote blocking messages
+
+Pass an optional `message` string to `block_apps`, `create_schedule`,
+`update_schedule`, `create_preset`, `update_preset`, `activate_preset`,
+`create_device_mode`, `update_device_mode`, or `activate_device_mode`.
+Messages are plain text, limited to 240 UTF-16 code units (most emoji use two).
+Line breaks are supported. Empty or whitespace-only text clears a message.
+The relay also accepts null to clear it. Invalid types, control characters
+other than tabs and line breaks, and over-limit text are rejected.
+
+Omitting the field on an update preserves the stored message. Preset and mode
+activations inherit the template message unless explicitly overridden, and
+snapshot it at activation. Mode sequences inherit each step's template message.
+
+The remote block with the latest effective end time supplies the overlay
+message. At equal end times, immediate blocks win, followed by schedules
+(including preset activations), then device modes. Within either rule category
+the lowest lexicographic rule ID wins. If the winning rule has no message,
+the overlay uses its standard remote explanation. Local restriction precedence
+and the union of active blocks are unchanged.
+
+Messages are optional fields in existing desired-state JSON and are available
+in the corresponding block, schedule, preset, and mode records in status.
+No database migration is needed. Deploy the updated Worker, refresh MCP tool
+discovery, and install the updated Android APK over the existing app.
+Older Android builds continue enforcing these blocks with the generic text.

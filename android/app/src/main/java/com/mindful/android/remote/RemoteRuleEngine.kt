@@ -13,12 +13,12 @@ sealed class RemoteTiming {
                       val startDate: LocalDate? = null, val endDate: LocalDate? = null) : RemoteTiming()
 }
 data class RemoteRule(val id: String, val name: String, val packages: Set<String>, val timing: RemoteTiming,
-                      val presetId: String? = null, val pausedUntilMs: Long = 0, val deleted: Boolean = false, val disabled: Boolean = false)
+                      val presetId: String? = null, val pausedUntilMs: Long = 0, val deleted: Boolean = false, val disabled: Boolean = false, val message: String? = null)
 data class RemotePreset(val id: String, val pausedUntilMs: Long = 0, val deleted: Boolean = false, val disabled: Boolean = false)
-data class RemoteSnapshot(val revision: Long, val blocks: Map<String, Long>, val rules: List<RemoteRule>, val presets: List<RemotePreset>, val deviceModes: com.mindful.android.modes.DeviceModeState = com.mindful.android.modes.DeviceModeState())
+data class RemoteSnapshot(val revision: Long, val blocks: Map<String, Long>, val rules: List<RemoteRule>, val presets: List<RemotePreset>, val deviceModes: com.mindful.android.modes.DeviceModeState = com.mindful.android.modes.DeviceModeState(), val blockMessages: Map<String, String> = emptyMap())
 data class RemoteWindow(val startAtMs: Long, val endAtMs: Long)
 data class RemoteRuleState(val id: String, val phase: String, val nextWindow: RemoteWindow?)
-data class RemoteEvaluation(val activeBlocks: Map<String, Long>, val states: List<RemoteRuleState>, val nextTransitionMs: Long?, val modes: com.mindful.android.modes.DeviceModeEvaluation? = null)
+data class RemoteEvaluation(val activeBlocks: Map<String, Long>, val states: List<RemoteRuleState>, val nextTransitionMs: Long?, val modes: com.mindful.android.modes.DeviceModeEvaluation? = null, val blockMessages: Map<String, String> = emptyMap())
 
 /** Pure calendar/state engine. No Android, network, usage data, or upstream restrictions. */
 object RemoteRuleEngine {
@@ -47,9 +47,23 @@ object RemoteRuleEngine {
     }
     fun evaluate(snapshot: RemoteSnapshot, allowed: Set<String>, now: Long, modeEligible: Set<String> = allowed, modesEnabled: Boolean = true, stopped: Set<String> = emptySet()): RemoteEvaluation {
         val active = mutableMapOf<String, Long>()
+        val messages = mutableMapOf<String, String>()
+        val winningKeys = mutableMapOf<String, String>()
+
+        // Match the overlay deadline first. Equal deadlines prefer immediate blocks,
+        // then schedules (including preset instances), then modes, ordered by ID.
+        fun record(packageName: String, end: Long, key: String, message: String?) {
+            val previousEnd = active[packageName]
+            if (previousEnd == null || end > previousEnd ||
+                (end == previousEnd && key < winningKeys.getValue(packageName))) {
+                active[packageName] = end
+                winningKeys[packageName] = key
+                if (message == null) messages.remove(packageName) else messages[packageName] = message
+            }
+        }
         val transitions = mutableListOf<Long>()
         val states = mutableListOf<RemoteRuleState>()
-        for ((pkg, end) in snapshot.blocks) if (pkg in allowed && end > now) {active[pkg] = end; transitions.add(end)}
+        for ((pkg, end) in snapshot.blocks) if (pkg in allowed && end > now) {record(pkg, end, "0", snapshot.blockMessages[pkg]); transitions.add(end)}
         val parents = snapshot.presets.associateBy { it.id }
         for (rule in snapshot.rules) {
             val parent = rule.presetId?.let { parents[it] }
@@ -69,7 +83,7 @@ object RemoteRuleEngine {
                     } else {
                         val current = upcoming.firstOrNull { it.startAtMs <= now && it.endAtMs > now }
                         phase = if (current != null) "active" else if (upcoming.isEmpty()) "expired" else "scheduled"
-                        if (current != null) for (pkg in rule.packages.filter { it in allowed }) active[pkg] = maxOf(active[pkg] ?: 0, current.endAtMs)
+                        if (current != null) for (pkg in rule.packages.filter { it in allowed }) record(pkg, current.endAtMs, "1:"+rule.id, rule.message)
                         for (window in upcoming) {
                             if (window.startAtMs > now) transitions.add(window.startAtMs)
                             if (window.endAtMs > now) transitions.add(window.endAtMs)
@@ -80,9 +94,13 @@ object RemoteRuleEngine {
             states.add(RemoteRuleState(rule.id, phase, nextWindow))
         }
         val modes = com.mindful.android.modes.DeviceModeEngine.evaluate(snapshot.deviceModes, allowed.intersect(modeEligible), now, modesEnabled, stopped)
-        for((pkg,end) in modes.blocks)active[pkg]=maxOf(active[pkg]?:0,end)
+        for (state in modes.states) {
+            val window = state.window ?: continue
+            val end = minOf(window.endAtMs, state.instance.expiresAtMs)
+            for (pkg in state.blocked) record(pkg, end, "2:"+state.instance.id, state.instance.message)
+        }
         modes.nextAtMs?.let{transitions.add(it)}
-        return RemoteEvaluation(active, states, transitions.minOrNull(), modes)
+        return RemoteEvaluation(active, states, transitions.minOrNull(), modes, messages)
     }
 }
 

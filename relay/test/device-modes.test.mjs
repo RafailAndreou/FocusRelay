@@ -177,3 +177,12 @@ test('existing owned alarms can be cancelled after Device Modes are disabled loc
  await sync(e,-1,report({deviceModes:dm}));const a=await(await op(e,'set_alarm',{triggerAt:new Date(Math.ceil((Date.now()+300000)/60000)*60000).toISOString(),requestId:'cancel-disabled'})).json();
  await sync(e,a.revision,report({deviceModes:{...dm,enabled:false}}));assert.equal((await op(e,'cancel_alarm',{id:a.item.id})).status,202);
 });
+
+test('mode messages are inherited, can be overridden, and survive JSON persistence',()=>{
+  const s=emptyModes();
+  const t=template(s,{message:'Work first\r\nTake a break later 🌿'});
+  assert.equal(activate(s,t).message,'Work first\nTake a break later 🌿');
+  assert.equal(activate(s,t,{message:'Just this session'}).message,'Just this session');
+  assert.equal(activate(s,t,{message:'   '}).message,undefined);
+  assert.equal(JSON.parse(JSON.stringify(s)).instances[0].message,'Work first\nTake a break later 🌿');
+});
